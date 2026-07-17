@@ -10,7 +10,7 @@ import type {
   TenantStatus,
 } from '@/types/database.types'
 import type { Tenant } from '@/types/domain'
-import { formatCurrency } from '@/utils/format'
+import { formatCurrency, monthKey as localMonthKey } from '@/utils/format'
 
 /**
  * Local, mutable "demo database" — a single localStorage-persisted JSON
@@ -23,10 +23,6 @@ import { formatCurrency } from '@/utils/format'
 
 const STORAGE_KEY = 'staygrid.demoDb'
 const BUILDING_ID = 'bld-1'
-
-function localMonthKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
 
 /** Sums a tenant's payments for the given `forMonth` (YYYY-MM-01) and derives
  * the resulting rent status against their current rent. */
@@ -740,28 +736,6 @@ export function updateExpense(input: UpdateExpenseInput): void {
 
 export function deleteExpense(expenseId: string): void {
   updateDemoDb((db) => ({ ...db, expenses: db.expenses.filter((e) => e.id !== expenseId) }))
-}
-
-export interface AddMaintenanceInput {
-  roomId: string
-  title: string
-  description: string | null
-  priority: MaintenancePriority
-}
-
-export function addMaintenance(input: AddMaintenanceInput): DemoMaintenance {
-  const record: DemoMaintenance = {
-    id: crypto.randomUUID(),
-    roomId: input.roomId,
-    title: input.title,
-    description: input.description,
-    priority: input.priority,
-    status: 'open',
-    createdAt: new Date().toISOString(),
-  }
-  updateDemoDb((db) => ({ ...db, maintenance: [...db.maintenance, record] }))
-  pushNotification('maintenance', 'Maintenance reported', input.title)
-  return record
 }
 
 export interface SendBroadcastInput {

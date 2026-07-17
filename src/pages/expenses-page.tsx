@@ -48,68 +48,70 @@ export function ExpensesPage() {
   })
 
   return (
-    <PullToRefresh onRefresh={refetch}>
-      <div className="space-y-4">
-        {expenses && expenses.length > 0 ? (
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by category or description"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        ) : null}
-
-        {isError ? (
-          <ErrorState title="Couldn't load expenses" description="Please try again." onRetry={() => refetch()} />
-        ) : isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-xl" />
-            ))}
-          </div>
-        ) : !expenses || expenses.length === 0 ? (
-          <EmptyState icon={Wallet} title="No expenses yet" description="Add your first expense to start tracking costs." />
-        ) : filteredExpenses.length === 0 ? (
-          <EmptyState icon={Search} title="No matches" description="Try a different search." />
-        ) : (
-          <div className="space-y-2">
-            {filteredExpenses.map((expense) => (
-              <ExpenseListItem
-                key={expense.id}
-                expense={expense}
-                onEdit={() => setEditingExpense(expense)}
-                onDelete={() => setDeletingExpense(expense)}
+    <>
+      <PullToRefresh onRefresh={refetch}>
+        <div className="space-y-4">
+          {expenses && expenses.length > 0 ? (
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by category or description"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
               />
-            ))}
-          </div>
-        )}
+            </div>
+          ) : null}
 
-        <Fab onClick={() => setAddOpen(true)}>
-          <Plus className="size-6" />
-        </Fab>
+          {isError ? (
+            <ErrorState title="Couldn't load expenses" description="Please try again." onRetry={() => refetch()} />
+          ) : isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-xl" />
+              ))}
+            </div>
+          ) : !expenses || expenses.length === 0 ? (
+            <EmptyState icon={Wallet} title="No expenses yet" description="Add your first expense to start tracking costs." />
+          ) : filteredExpenses.length === 0 ? (
+            <EmptyState icon={Search} title="No matches" description="Try a different search." />
+          ) : (
+            <div className="space-y-2">
+              {filteredExpenses.map((expense) => (
+                <ExpenseListItem
+                  key={expense.id}
+                  expense={expense}
+                  onEdit={() => setEditingExpense(expense)}
+                  onDelete={() => setDeletingExpense(expense)}
+                />
+              ))}
+            </div>
+          )}
 
-        <AddExpenseSheet open={addOpen} onOpenChange={setAddOpen} />
-        <AddExpenseSheet
-          open={editingExpense !== null}
-          onOpenChange={(open) => !open && setEditingExpense(null)}
-          existingExpense={editingExpense}
-        />
+          <AddExpenseSheet open={addOpen} onOpenChange={setAddOpen} />
+          <AddExpenseSheet
+            open={editingExpense !== null}
+            onOpenChange={(open) => !open && setEditingExpense(null)}
+            existingExpense={editingExpense}
+          />
 
-        <ConfirmSheet
-          open={deletingExpense !== null}
-          onOpenChange={(open) => !open && setDeletingExpense(null)}
-          title="Delete this expense?"
-          description="This can't be undone."
-          confirmLabel="Delete"
-          isPending={deleteMutation.isPending}
-          onConfirm={() => {
-            if (deletingExpense) deleteMutation.mutate(deletingExpense.id)
-          }}
-        />
-      </div>
-    </PullToRefresh>
+          <ConfirmSheet
+            open={deletingExpense !== null}
+            onOpenChange={(open) => !open && setDeletingExpense(null)}
+            title="Delete this expense?"
+            description="This can't be undone."
+            confirmLabel="Delete"
+            isPending={deleteMutation.isPending}
+            onConfirm={() => {
+              if (deletingExpense) deleteMutation.mutate(deletingExpense.id)
+            }}
+          />
+        </div>
+      </PullToRefresh>
+
+      <Fab onClick={() => setAddOpen(true)}>
+        <Plus className="size-6" />
+      </Fab>
+    </>
   )
 }

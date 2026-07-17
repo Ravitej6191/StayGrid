@@ -107,6 +107,7 @@ create table beds (
 -- ---------------------------------------------------------------------
 create table tenants (
   id uuid primary key default gen_random_uuid(),
+  building_id uuid not null references building(id) on delete cascade,
   bed_id uuid references beds(id) on delete set null,
   name text not null,
   phone text not null,
@@ -310,33 +311,20 @@ create policy beds_owner_all on beds
 
 create policy tenants_owner_all on tenants
   for all using (
-    bed_id is null or exists (
-      select 1 from beds bd join rooms r on r.id = bd.room_id
-      join floors f on f.id = r.floor_id join building b on b.id = f.building_id
-      where bd.id = tenants.bed_id and b.owner_id = auth.uid()
-    )
+    exists (select 1 from building b where b.id = tenants.building_id and b.owner_id = auth.uid())
   ) with check (
-    bed_id is null or exists (
-      select 1 from beds bd join rooms r on r.id = bd.room_id
-      join floors f on f.id = r.floor_id join building b on b.id = f.building_id
-      where bd.id = tenants.bed_id and b.owner_id = auth.uid()
-    )
+    exists (select 1 from building b where b.id = tenants.building_id and b.owner_id = auth.uid())
   );
 
 create policy payments_owner_all on payments
   for all using (
-    exists (select 1 from tenants t where t.id = payments.tenant_id)
-    and exists (
-      select 1 from tenants t join beds bd on bd.id = t.bed_id
-      join rooms r on r.id = bd.room_id join floors f on f.id = r.floor_id
-      join building b on b.id = f.building_id
+    exists (
+      select 1 from tenants t join building b on b.id = t.building_id
       where t.id = payments.tenant_id and b.owner_id = auth.uid()
     )
   ) with check (
     exists (
-      select 1 from tenants t join beds bd on bd.id = t.bed_id
-      join rooms r on r.id = bd.room_id join floors f on f.id = r.floor_id
-      join building b on b.id = f.building_id
+      select 1 from tenants t join building b on b.id = t.building_id
       where t.id = payments.tenant_id and b.owner_id = auth.uid()
     )
   );
@@ -371,16 +359,12 @@ create policy inventory_owner_all on inventory
 create policy documents_owner_all on documents
   for all using (
     exists (
-      select 1 from tenants t join beds bd on bd.id = t.bed_id
-      join rooms r on r.id = bd.room_id join floors f on f.id = r.floor_id
-      join building b on b.id = f.building_id
+      select 1 from tenants t join building b on b.id = t.building_id
       where t.id = documents.tenant_id and b.owner_id = auth.uid()
     )
   ) with check (
     exists (
-      select 1 from tenants t join beds bd on bd.id = t.bed_id
-      join rooms r on r.id = bd.room_id join floors f on f.id = r.floor_id
-      join building b on b.id = f.building_id
+      select 1 from tenants t join building b on b.id = t.building_id
       where t.id = documents.tenant_id and b.owner_id = auth.uid()
     )
   );
@@ -396,12 +380,31 @@ create policy settings_owner_all on settings
   for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ---------------------------------------------------------------------
+-- Storage — tenant photos and deposit screenshots. Uploaded to
+-- `<owner_id>/<folder>/<file>` so a simple path-prefix check scopes every
+-- read/write to the uploading owner. Bucket is public (public URLs are
+-- returned to the client) since these are non-sensitive display images;
+-- switch to signed URLs if that changes.
+-- ---------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('tenant-uploads', 'tenant-uploads', true)
+on conflict (id) do nothing;
+
+create policy tenant_uploads_owner_all on storage.objects
+  for all using (
+    bucket_id = 'tenant-uploads' and (storage.foldername(name))[1] = auth.uid()::text
+  ) with check (
+    bucket_id = 'tenant-uploads' and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- ---------------------------------------------------------------------
 -- Indexes for common lookups
 -- ---------------------------------------------------------------------
 create index floors_building_id_idx on floors(building_id);
 create index rooms_floor_id_idx on rooms(floor_id);
 create index beds_room_id_idx on beds(room_id);
 create index tenants_bed_id_idx on tenants(bed_id);
+create index tenants_building_id_idx on tenants(building_id);
 create index payments_tenant_id_idx on payments(tenant_id);
 create index expenses_building_id_idx on expenses(building_id);
 create index maintenance_room_id_idx on maintenance(room_id);

@@ -49,7 +49,7 @@ export function AppHeader() {
         className="-mr-1 flex size-9 shrink-0 items-center justify-center rounded-full"
       >
         <Avatar className="size-7">
-          {user?.photoUrl ? <AvatarImage src={user.photoUrl} alt={user.name} /> : null}
+          {user?.photoUrl ? <AvatarImage src={user.photoUrl} alt={user.name} referrerPolicy="no-referrer" /> : null}
           <AvatarFallback className="text-[11px]">{user ? initials(user.name) : ''}</AvatarFallback>
         </Avatar>
       </button>

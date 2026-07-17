@@ -57,7 +57,7 @@ export function ExpenseListItem({ expense, onEdit, onDelete }: ExpenseListItemPr
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/80 p-3 backdrop-blur-sm">
-      <button type="button" onClick={onEdit} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${colorByCategory[expense.category]}`}>
           <Icon className="size-4" />
         </span>
@@ -67,7 +67,7 @@ export function ExpenseListItem({ expense, onEdit, onDelete }: ExpenseListItemPr
             {expense.description || formatDateTime(expense.expenseDate)}
           </p>
         </div>
-      </button>
+      </div>
       <p className="font-numeric text-sm font-semibold text-foreground">{formatCurrency(expense.amount)}</p>
       <button
         type="button"

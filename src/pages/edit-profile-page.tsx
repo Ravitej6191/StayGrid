@@ -17,6 +17,7 @@ import { useBuildingData } from '@/features/building/hooks/use-building-data'
 import { updateProfile } from '@/features/onboarding/services/onboarding.service'
 import { useAuth } from '@/providers/auth-provider'
 import { usePageTitle } from '@/hooks/use-page-title'
+import { digitsOnly } from '@/utils/format'
 import type { PropertyType } from '@/types/database.types'
 
 const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
@@ -37,10 +38,6 @@ const profileSchema = z.object({
 })
 
 type ProfileFormValues = z.infer<typeof profileSchema>
-
-function digitsOnly(value: string, maxLength: number) {
-  return value.replace(/\D/g, '').slice(0, maxLength)
-}
 
 export function EditProfilePage() {
   const navigate = useNavigate()

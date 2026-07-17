@@ -91,9 +91,6 @@ export function SettingsPage() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">{data.building.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {data.building.city || 'No city set'}
-                    </p>
                   </div>
                 </div>
                 <Button
@@ -234,11 +231,9 @@ export function SettingsPage() {
               }}
             />
           </div>
-        </CardContent>
-      </Card>
 
-      <Card className="border-border/70 bg-card/80 backdrop-blur-sm">
-        <CardContent className="space-y-1">
+          <Separator />
+
           <button
             type="button"
             onClick={() => navigate('/settings/whatsapp')}
@@ -264,11 +259,9 @@ export function SettingsPage() {
             <span className="flex-1 text-sm font-medium text-foreground">Past Tenants</span>
             <ChevronRight className="size-4 text-muted-foreground" />
           </button>
-        </CardContent>
-      </Card>
 
-      <Card className="border-border/70 bg-card/80 backdrop-blur-sm">
-        <CardContent className="space-y-1">
+          <Separator />
+
           <button
             type="button"
             onClick={() => setClearDataOpen(true)}

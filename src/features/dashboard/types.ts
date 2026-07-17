@@ -4,7 +4,7 @@ export interface DashboardStats {
   monthlyExpense: number
   occupancyPercent: number
   vacantCount: number
-  complaintsCount: number
+  pendingDepositsCount: number
 }
 
 export interface IncomeExpenseTrendPoint {

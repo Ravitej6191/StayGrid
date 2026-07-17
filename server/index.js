@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import QRCode from 'qrcode'
@@ -11,6 +12,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const AUTH_DIR = path.join(__dirname, 'auth_info')
 const PORT = process.env.PORT || 4000
 const QR_TTL_MS = 20_000 // WhatsApp rotates the QR roughly every 20s
+
+const AUTH_TOKEN = process.env.WHATSAPP_SERVER_TOKEN
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+
+if (!AUTH_TOKEN) {
+  console.error(
+    'WHATSAPP_SERVER_TOKEN is not set. Refusing to start — anyone able to reach this port could hijack the ' +
+      'WhatsApp session or send messages on your behalf. Set it in server/.env (see server/.env.example).',
+  )
+  process.exit(1)
+}
 
 const logger = pino({ level: 'silent' })
 
@@ -99,8 +114,24 @@ async function startSocket() {
 }
 
 const app = express()
-app.use(cors())
+app.use(
+  cors({
+    origin: ALLOWED_ORIGINS,
+  }),
+)
 app.use(express.json())
+
+// Every /api/whatsapp/* route requires a bearer token matching WHATSAPP_SERVER_TOKEN.
+// Without this, anyone who can reach this port could hijack the WhatsApp session,
+// disconnect it, or send arbitrary messages from the owner's real account.
+app.use('/api/whatsapp', (req, res, next) => {
+  const header = req.get('authorization') ?? ''
+  const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : null
+  if (token !== AUTH_TOKEN) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' })
+  }
+  next()
+})
 
 app.post('/api/whatsapp/connect', async (req, res) => {
   if (state.status === 'connected') return res.json({ ok: true, state })

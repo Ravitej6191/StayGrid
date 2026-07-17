@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Banknote, BedDouble, DoorOpen, IndianRupee, MessageSquareWarning } from 'lucide-react'
+import { AlertTriangle, Banknote, BedDouble, DoorOpen, IndianRupee, ShieldAlert } from 'lucide-react'
 import { ChartCard } from '@/components/common/chart-card'
 import { ErrorState } from '@/components/common/error-state'
 import { PullToRefresh } from '@/components/common/pull-to-refresh'
@@ -56,14 +56,14 @@ export function DashboardPage() {
           <>
             <div className="grid grid-cols-3 gap-2.5">
               <StatCard icon={IndianRupee} label="Income This Month" value={formatCurrency(data.stats.incomeThisMonth)} tone="primary" />
-              <StatCard icon={AlertTriangle} label="Pending" value={formatCurrency(data.stats.pendingRent)} tone="danger" />
-              <StatCard icon={Banknote} label="Expense" value={formatCurrency(data.stats.monthlyExpense)} tone="warning" />
+              <StatCard icon={Banknote} label="Expense This Month" value={formatCurrency(data.stats.monthlyExpense)} tone="warning" />
+              <StatCard icon={AlertTriangle} label="Pending Rents" value={formatCurrency(data.stats.pendingRent)} tone="danger" />
               <StatCard icon={DoorOpen} label="Occupancy" value={`${data.stats.occupancyPercent}%`} tone="info" />
               <StatCard icon={BedDouble} label="Vacant Beds" value={String(data.stats.vacantCount)} tone="neutral" />
-              <StatCard icon={MessageSquareWarning} label="Complaints" value={String(data.stats.complaintsCount)} tone="danger" />
+              <StatCard icon={ShieldAlert} label="Pending Deposits" value={String(data.stats.pendingDepositsCount)} tone="danger" />
             </div>
 
-            <ChartCard title="Income vs Expenses" description="Last 6 months">
+            <ChartCard title="Income vs Expenses" description="All time">
               {data.trend.every((d) => d.income === 0 && d.expenses === 0) ? (
                 <p className="flex h-[240px] items-center justify-center text-sm text-muted-foreground">
                   No income or expenses recorded yet.

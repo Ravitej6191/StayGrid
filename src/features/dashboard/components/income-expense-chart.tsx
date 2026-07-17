@@ -8,35 +8,39 @@ function compactCurrency(value: number): string {
   return `₹${value}`
 }
 
-function withAlpha(color: string, alphaPercent: number): string {
-  return color.replace(/\)$/, ` / ${alphaPercent}%)`)
-}
-
 export function IncomeExpenseChart({ data }: { data: IncomeExpenseTrendPoint[] }) {
   const colors = useThemeColors()
 
   const option = {
     animation: false,
-    grid: { left: 8, right: 8, top: 40, bottom: 30 },
+    grid: { left: 8, right: 8, top: 44, bottom: 28, containLabel: true },
     legend: {
       data: ['Income', 'Expenses'],
       top: 0,
-      right: 0,
+      left: 'center',
       icon: 'circle',
       itemWidth: 8,
       itemHeight: 8,
       textStyle: { color: colors['muted-foreground'], fontSize: 12 },
     },
     tooltip: {
-      trigger: 'axis',
+      trigger: 'item',
+      triggerOn: 'click',
+      confine: true,
       backgroundColor: colors.popover,
       borderColor: colors.border,
+      borderWidth: 1,
       textStyle: { color: colors['popover-foreground'], fontSize: 12 },
-      valueFormatter: (value: number) => compactCurrency(value),
+      extraCssText: 'border-radius: 10px; padding: 8px 12px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);',
+      formatter: (params: { seriesName: string; name: string; value: number; color: string }) =>
+        `<div style="font-weight:600;margin-bottom:2px;">${params.name}</div>` +
+        `<div style="display:flex;align-items:center;gap:6px;">` +
+        `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${params.color};"></span>` +
+        `${params.seriesName}: <b>${compactCurrency(params.value)}</b></div>`,
     },
     xAxis: {
       type: 'category',
-      boundaryGap: false,
+      boundaryGap: true,
       data: data.map((d) => d.month),
       axisLine: { lineStyle: { color: colors.border } },
       axisLabel: { color: colors['muted-foreground'], fontSize: 11 },
@@ -46,37 +50,18 @@ export function IncomeExpenseChart({ data }: { data: IncomeExpenseTrendPoint[] }
     series: [
       {
         name: 'Income',
-        type: 'line',
-        smooth: 0.3,
-        smoothMonotone: 'x',
-        symbol: 'circle',
-        symbolSize: 6,
-        lineStyle: { color: colors.primary, width: 2.5 },
-        itemStyle: { color: colors.primary },
-        areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: withAlpha(colors.primary, 35) },
-              { offset: 1, color: withAlpha(colors.primary, 0) },
-            ],
-          },
-        },
+        type: 'bar',
+        barMaxWidth: 18,
+        itemStyle: { color: colors.primary, borderRadius: [4, 4, 0, 0] },
+        emphasis: { disabled: true },
         data: data.map((d) => d.income),
       },
       {
         name: 'Expenses',
-        type: 'line',
-        smooth: 0.3,
-        smoothMonotone: 'x',
-        symbol: 'circle',
-        symbolSize: 6,
-        lineStyle: { color: colors.warning, width: 2 },
-        itemStyle: { color: colors.warning },
+        type: 'bar',
+        barMaxWidth: 18,
+        itemStyle: { color: colors.warning, borderRadius: [4, 4, 0, 0] },
+        emphasis: { disabled: true },
         data: data.map((d) => d.expenses),
       },
     ],

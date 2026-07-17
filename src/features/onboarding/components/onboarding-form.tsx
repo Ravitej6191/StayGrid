@@ -13,6 +13,7 @@ import { SearchCombobox } from '@/components/common/search-combobox'
 import { useQueryClient } from '@tanstack/react-query'
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard'
 import { getCitiesForState, indianStates } from '@/constants/india-geo'
+import { digitsOnly } from '@/utils/format'
 import { completeOnboarding } from '../services/onboarding.service'
 
 const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
@@ -33,10 +34,6 @@ const onboardingSchema = z.object({
 })
 
 type OnboardingFormValues = z.infer<typeof onboardingSchema>
-
-function digitsOnly(value: string, maxLength: number) {
-  return value.replace(/\D/g, '').slice(0, maxLength)
-}
 
 export function OnboardingForm() {
   const navigate = useNavigate()

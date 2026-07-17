@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from '@/config/env'
 import { supabase } from '@/lib/supabase'
 import { getDemoDb } from '@/lib/demo-store'
+import { monthKey as monthKeyOf } from '@/utils/format'
 import type { DashboardData, IncomeExpenseTrendPoint } from '../types'
 
 function monthKey(dateStr: string): string {
@@ -8,8 +9,7 @@ function monthKey(dateStr: string): string {
 }
 
 function currentMonthKey(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  return monthKeyOf(new Date())
 }
 
 function monthLabel(key: string): string {
@@ -17,14 +17,22 @@ function monthLabel(key: string): string {
   return new Date(year!, (month ?? 1) - 1, 1).toLocaleString('en-IN', { month: 'short' })
 }
 
-function lastSixMonthKeys(): string[] {
-  const keys: string[] = []
+/** Every month key from the earliest activity date through the current
+ * month, so the chart shows the full history instead of a fixed window. */
+function allMonthKeysSince(earliestDate: string | null): string[] {
   const now = new Date()
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  const nowKey = monthKeyOf(now)
+  if (!earliestDate) return [nowKey]
+
+  const [startYear, startMonth] = earliestDate.slice(0, 7).split('-').map(Number)
+  const start = new Date(startYear!, (startMonth ?? 1) - 1, 1)
+  const keys: string[] = []
+  const cursor = new Date(start)
+  while (monthKeyOf(cursor) <= nowKey) {
+    keys.push(monthKeyOf(cursor))
+    cursor.setMonth(cursor.getMonth() + 1)
   }
-  return keys
+  return keys.length > 0 ? keys : [nowKey]
 }
 
 function getDemoData(): DashboardData {
@@ -47,9 +55,10 @@ function getDemoData(): DashboardData {
   const occupancyPercent = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0
   const vacantCount = totalBeds - occupiedBeds
 
-  const complaintsCount = db.maintenance.filter((m) => m.status === 'open' || m.status === 'in_progress').length
+  const pendingDepositsCount = activeTenants.filter((t) => !t.depositRecord).length
 
-  const months = lastSixMonthKeys()
+  const earliestDate = [...db.payments.map((p) => p.paymentDate), ...db.expenses.map((e) => e.expenseDate)].sort()[0] ?? null
+  const months = allMonthKeysSince(earliestDate)
   const trend: IncomeExpenseTrendPoint[] = months.map((key) => ({
     month: monthLabel(key),
     income: db.payments.filter((p) => monthKey(p.paymentDate) === key).reduce((s, p) => s + p.amount, 0),
@@ -63,7 +72,7 @@ function getDemoData(): DashboardData {
       monthlyExpense,
       occupancyPercent,
       vacantCount,
-      complaintsCount,
+      pendingDepositsCount,
     },
     trend,
   }
@@ -90,32 +99,45 @@ async function fetchFromSupabase(): Promise<DashboardData> {
 
   const sum = (rows: { amount: number }[] | null) => (rows ?? []).reduce((s, r) => s + r.amount, 0)
 
-  const [monthPayments, monthExpenses, tenants, bedCountResult, complaintsResult] = await Promise.all([
+  const [monthPayments, monthExpenses, tenants, bedCountResult, earliestPayment, earliestExpense] = await Promise.all([
     supabase.from('payments').select('amount').gte('payment_date', startOfMonthIso()),
     supabase
       .from('expenses')
       .select('amount')
       .eq('building_id', buildingRow.id)
       .gte('expense_date', startOfMonthIso()),
-    supabase.from('tenants').select('id, rent, rent_status, status'),
+    supabase.from('tenants').select('id, rent, rent_status, status, deposit_paid_amount').eq('building_id', buildingRow.id),
     supabase.from('beds').select('id', { count: 'exact', head: true }),
-    supabase.from('maintenance').select('id', { count: 'exact', head: true }).in('status', ['open', 'in_progress']),
+    supabase.from('payments').select('payment_date').order('payment_date', { ascending: true }).limit(1),
+    supabase
+      .from('expenses')
+      .select('expense_date')
+      .eq('building_id', buildingRow.id)
+      .order('expense_date', { ascending: true })
+      .limit(1),
   ])
 
   const activeTenants = (tenants.data ?? []).filter((t) => t.status === 'active')
   const pendingRent = activeTenants
     .filter((t) => t.rent_status === 'pending')
     .reduce((s, t) => s + t.rent, 0)
+  const pendingDepositsCount = activeTenants.filter((t) => t.deposit_paid_amount === null).length
 
   const thisMonthTotal = sum(monthPayments.data)
   const monthlyExpense = sum(monthExpenses.data)
   const totalBeds = bedCountResult.count ?? 0
   const occupancyPercent = totalBeds ? Math.round((activeTenants.length / totalBeds) * 100) : 0
 
+  const earliestDate = [earliestPayment.data?.[0]?.payment_date, earliestExpense.data?.[0]?.expense_date]
+    .filter((d): d is string => Boolean(d))
+    .sort()[0] ?? null
+  const months = allMonthKeysSince(earliestDate)
+
   const trend: IncomeExpenseTrendPoint[] = []
-  for (let i = 5; i >= 0; i--) {
-    const from = startOfMonthIso(-i)
-    const to = startOfMonthIso(-i + 1)
+  for (const key of months) {
+    const [year, month] = key.split('-').map(Number)
+    const from = new Date(year!, (month ?? 1) - 1, 1).toISOString().slice(0, 10)
+    const to = new Date(year!, month ?? 1, 1).toISOString().slice(0, 10)
     const [inc, exp] = await Promise.all([
       supabase.from('payments').select('amount').gte('payment_date', from).lt('payment_date', to),
       supabase
@@ -126,7 +148,7 @@ async function fetchFromSupabase(): Promise<DashboardData> {
         .lt('expense_date', to),
     ])
     trend.push({
-      month: new Date(from).toLocaleString('en-IN', { month: 'short' }),
+      month: monthLabel(key),
       income: sum(inc.data),
       expenses: sum(exp.data),
     })
@@ -139,7 +161,7 @@ async function fetchFromSupabase(): Promise<DashboardData> {
       monthlyExpense,
       occupancyPercent,
       vacantCount: totalBeds - activeTenants.length,
-      complaintsCount: complaintsResult.count ?? 0,
+      pendingDepositsCount,
     },
     trend,
   }

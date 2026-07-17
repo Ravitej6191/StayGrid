@@ -14,6 +14,7 @@ import {
   type RecordDepositInput as DemoRecordDepositInput,
   type UpdateTenantInput as DemoUpdateTenantInput,
 } from '@/lib/demo-store'
+import { monthKey } from '@/utils/format'
 import type { PaymentMode, RentStatus, TenantRow } from '@/types/database.types'
 import type { Tenant } from '@/types/domain'
 
@@ -84,9 +85,11 @@ export async function getTenants(): Promise<Tenant[]> {
 
   const { data: beds, error: bedsError } = await supabase.from('beds').select('id, room_id').in('room_id', roomIds)
   if (bedsError) throw bedsError
-  const bedIds = beds.map((b) => b.id)
 
-  const { data: tenantRows, error: tenantsError } = await supabase.from('tenants').select('*').in('bed_id', bedIds)
+  const { data: tenantRows, error: tenantsError } = await supabase
+    .from('tenants')
+    .select('*')
+    .eq('building_id', buildingRow.id)
   if (tenantsError) throw tenantsError
 
   const roomById = new Map(rooms.map((r) => [r.id, r]))
@@ -160,9 +163,22 @@ export async function createTenant(input: CreateTenantInput): Promise<string> {
     return demoAddTenant(input).id
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: buildingRow, error: buildingError } = await supabase
+    .from('building')
+    .select('id')
+    .eq('owner_id', user.id)
+    .single()
+  if (buildingError) throw buildingError
+
   const { data, error: tenantError } = await supabase
     .from('tenants')
     .insert({
+      building_id: buildingRow.id,
       bed_id: input.bedId,
       name: input.name,
       phone: input.phone,
@@ -192,8 +208,7 @@ export async function createTenant(input: CreateTenantInput): Promise<string> {
 export type UpdateTenantInput = DemoUpdateTenantInput
 
 function currentMonthForMonth(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  return `${monthKey(new Date())}-01`
 }
 
 export async function updateTenant(input: UpdateTenantInput): Promise<void> {

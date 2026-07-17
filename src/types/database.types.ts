@@ -94,6 +94,7 @@ export type BedRow = {
 
 export type TenantRow = {
   id: string
+  building_id: string
   bed_id: string | null
   name: string
   phone: string

@@ -3,12 +3,18 @@ import type { WhatsAppState } from '../types'
 
 const BASE_URL = env.whatsappServerUrl
 
+function authHeaders(): HeadersInit {
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  if (env.whatsappServerToken) headers.Authorization = `Bearer ${env.whatsappServerToken}`
+  return headers
+}
+
 async function request(path: string, init?: RequestInit): Promise<WhatsAppState> {
   let response: Response
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       ...init,
     })
   } catch {
@@ -28,7 +34,7 @@ export async function connectWhatsApp(): Promise<WhatsAppState> {
 
 export async function getWhatsAppStatus(): Promise<WhatsAppState> {
   try {
-    const response = await fetch(`${BASE_URL}/api/whatsapp/status`)
+    const response = await fetch(`${BASE_URL}/api/whatsapp/status`, { headers: authHeaders() })
     const body = await response.json().catch(() => null)
     if (!response.ok || !body?.ok) throw new Error(body?.error ?? 'Could not fetch WhatsApp status.')
     return body.state as WhatsAppState
@@ -63,7 +69,7 @@ export async function sendWhatsAppMessage(to: string, message: string): Promise<
   try {
     const response = await fetch(`${BASE_URL}/api/whatsapp/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ to, message }),
     })
     const body = await response.json().catch(() => null)

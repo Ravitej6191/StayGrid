@@ -22,4 +22,5 @@ export const env = {
   supabaseUrl: supabaseUrl ?? PLACEHOLDER_URL,
   supabaseAnonKey: supabaseAnonKey ?? PLACEHOLDER_KEY,
   whatsappServerUrl: (import.meta.env.VITE_WHATSAPP_SERVER_URL as string | undefined) ?? 'http://localhost:4000',
+  whatsappServerToken: import.meta.env.VITE_WHATSAPP_SERVER_TOKEN as string | undefined,
 }

@@ -15,7 +15,8 @@ import { DatePicker } from '@/components/common/date-picker'
 import { TenantCombobox } from './tenant-combobox'
 import { useTenants } from '../hooks/use-tenants'
 import { createPayment, recordDeposit } from '../services/tenants.service'
-import { formatCurrency } from '@/utils/format'
+import { uploadTenantFile } from '@/lib/storage'
+import { formatCurrency, monthKey } from '@/utils/format'
 import { cn } from '@/lib/utils'
 
 const paymentModes = [
@@ -64,9 +65,12 @@ export function RecordPaymentSheet({ open, onOpenChange, defaultTenantId }: Reco
   const preselectedTenant = defaultTenantId ? activeTenants.find((t) => t.id === defaultTenantId) : undefined
   const [view, setView] = useState<'form' | 'success'>('form')
   const [successInfo, setSuccessInfo] = useState<{ tenantName: string; amount: number; kind: 'rent' | 'deposit' } | null>(null)
-  const [screenshot, setScreenshot] = useState<string | null>(null)
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
+  const [isUploadingScreenshot, setIsUploadingScreenshot] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+  const objectUrlRef = useRef<string | null>(null)
 
   const {
     register,
@@ -86,20 +90,20 @@ export function RecordPaymentSheet({ open, onOpenChange, defaultTenantId }: Reco
       reset(emptyValues(defaultTenantId))
       setView('form')
       setSuccessInfo(null)
-      setScreenshot(null)
+      setScreenshotFile(null)
+      setScreenshotPreview(null)
     }
   }, [open, defaultTenantId, reset])
 
   const selectedTenantId = watch('tenantId')
   const recordType = watch('recordType')
+  const paymentDate = watch('paymentDate')
   const selectedTenant = activeTenants.find((t) => t.id === selectedTenantId)
-  const alreadyPaid = recordType === 'rent' && selectedTenant?.rentStatus === 'paid'
+  const isCurrentMonth = paymentDate ? paymentDate.slice(0, 7) === monthKey(new Date()) : true
+  const alreadyPaid = recordType === 'rent' && isCurrentMonth && selectedTenant?.rentStatus === 'paid'
   const isDepositEdit = recordType === 'deposit' && Boolean(selectedTenant?.depositRecord)
 
-  const tenantOptions = activeTenants.filter((t) => {
-    if (t.id === selectedTenantId) return true
-    return recordType === 'rent' ? t.rentStatus !== 'paid' : true
-  })
+  const tenantOptions = activeTenants
 
   useEffect(() => {
     if (!selectedTenant) return
@@ -108,7 +112,8 @@ export function RecordPaymentSheet({ open, onOpenChange, defaultTenantId }: Reco
     } else {
       setValue('amount', selectedTenant.depositRecord?.amount ?? selectedTenant.deposit)
       setValue('paymentDate', selectedTenant.depositRecord?.paidDate || todayIso())
-      setScreenshot(selectedTenant.depositRecord?.screenshotUrl ?? null)
+      setScreenshotFile(null)
+      setScreenshotPreview(selectedTenant.depositRecord?.screenshotUrl ?? null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTenantId, recordType, tenants, open])
@@ -141,15 +146,27 @@ export function RecordPaymentSheet({ open, onOpenChange, defaultTenantId }: Reco
     onError: () => toast.error('Could not record the deposit. Please try again.'),
   })
 
-  const isPending = rentMutation.isPending || depositMutation.isPending
+  const isPending = rentMutation.isPending || depositMutation.isPending || isUploadingScreenshot
 
-  const onSubmit = (values: RecordFormValues) => {
+  const onSubmit = async (values: RecordFormValues) => {
     if (values.recordType === 'deposit') {
+      let screenshotUrl = screenshotFile ? null : screenshotPreview
+      if (screenshotFile) {
+        setIsUploadingScreenshot(true)
+        try {
+          screenshotUrl = await uploadTenantFile(screenshotFile, 'deposit-screenshots')
+        } catch {
+          toast.error('Could not upload the photo. Please try again.')
+          setIsUploadingScreenshot(false)
+          return
+        }
+        setIsUploadingScreenshot(false)
+      }
       depositMutation.mutate({
         tenantId: values.tenantId,
         amount: values.amount,
         paidDate: values.paymentDate,
-        screenshotUrl: screenshot,
+        screenshotUrl,
       })
     } else {
       if (alreadyPaid) return
@@ -168,18 +185,34 @@ export function RecordPaymentSheet({ open, onOpenChange, defaultTenantId }: Reco
   const handleRecordAnother = () => {
     reset(emptyValues())
     setSuccessInfo(null)
-    setScreenshot(null)
+    setScreenshotFile(null)
+    setScreenshotPreview(null)
     setView('form')
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setScreenshot(reader.result as string)
-    reader.readAsDataURL(file)
     e.target.value = ''
+    if (!file) return
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    const objectUrl = URL.createObjectURL(file)
+    objectUrlRef.current = objectUrl
+    setScreenshotFile(file)
+    setScreenshotPreview(objectUrl)
   }
+
+  const handleRemoveScreenshot = () => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    objectUrlRef.current = null
+    setScreenshotFile(null)
+    setScreenshotPreview(null)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    }
+  }, [])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -334,12 +367,12 @@ export function RecordPaymentSheet({ open, onOpenChange, defaultTenantId }: Reco
                 <Label>Photo (optional)</Label>
                 <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-                {screenshot ? (
+                {screenshotPreview ? (
                   <div className="relative w-fit">
-                    <img src={screenshot} alt="Deposit proof" className="h-32 rounded-lg border border-border/70 object-cover" />
+                    <img src={screenshotPreview} alt="Deposit proof" className="h-32 rounded-lg border border-border/70 object-cover" />
                     <button
                       type="button"
-                      onClick={() => setScreenshot(null)}
+                      onClick={handleRemoveScreenshot}
                       aria-label="Remove photo"
                       className="absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full bg-danger text-danger-foreground shadow-sm"
                     >

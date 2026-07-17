@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EmptyState } from '@/components/common/empty-state'
 import { useBuildingData } from '@/features/building/hooks/use-building-data'
 import { createTenant, reassignTenant, updateTenant } from '../services/tenants.service'
+import { uploadTenantFile } from '@/lib/storage'
+import { digitsOnly } from '@/utils/format'
 import type { Tenant } from '@/types/domain'
 
 function Required() {
@@ -29,10 +31,6 @@ const PHONE_REGEX = /^[6-9]\d{9}$/
 const MAX_AMOUNT = 10_000_000
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const
-
-function digitsOnly(value: string, maxLength: number) {
-  return value.replace(/\D/g, '').slice(0, maxLength)
-}
 
 const tenantSchema = z.object({
   name: z.string().min(2, 'Enter a name').max(80, 'Name is too long'),
@@ -79,8 +77,11 @@ export function AddTenantSheet({ open, onOpenChange, existingTenant }: AddTenant
   const [view, setView] = useState<View>('form')
   const [createdTenant, setCreatedTenant] = useState<{ id: string; name: string } | null>(null)
   const [allocatedBedLabel, setAllocatedBedLabel] = useState<string | null>(null)
-  const [photo, setPhoto] = useState<string | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const objectUrlRef = useRef<string | null>(null)
 
   const {
     register,
@@ -99,7 +100,8 @@ export function AddTenantSheet({ open, onOpenChange, existingTenant }: AddTenant
     setView('form')
     setCreatedTenant(null)
     setAllocatedBedLabel(null)
-    setPhoto(existingTenant?.photoUrl ?? null)
+    setPhotoFile(null)
+    setPhotoPreview(existingTenant?.photoUrl ?? null)
     if (existingTenant) {
       reset({
         name: existingTenant.name,
@@ -177,9 +179,22 @@ export function AddTenantSheet({ open, onOpenChange, existingTenant }: AddTenant
     onError: () => toast.error('Could not allocate a bed. Please try again.'),
   })
 
-  const isPending = createMutation.isPending || updateMutation.isPending
+  const isPending = createMutation.isPending || updateMutation.isPending || isUploadingPhoto
 
-  const onSubmit = (values: TenantFormValues) => {
+  const onSubmit = async (values: TenantFormValues) => {
+    let photoUrl = photoFile ? null : photoPreview
+    if (photoFile) {
+      setIsUploadingPhoto(true)
+      try {
+        photoUrl = await uploadTenantFile(photoFile, 'tenant-photos')
+      } catch {
+        toast.error('Could not upload the photo. Please try again.')
+        setIsUploadingPhoto(false)
+        return
+      }
+      setIsUploadingPhoto(false)
+    }
+
     const shared = {
       name: values.name,
       phone: values.phone,
@@ -190,7 +205,7 @@ export function AddTenantSheet({ open, onOpenChange, existingTenant }: AddTenant
       bloodGroup: values.bloodGroup || null,
       occupation: values.occupation || null,
       company: values.company || null,
-      photoUrl: photo,
+      photoUrl,
       rent: values.rent,
       deposit: values.deposit,
     }
@@ -204,12 +219,27 @@ export function AddTenantSheet({ open, onOpenChange, existingTenant }: AddTenant
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setPhoto(reader.result as string)
-    reader.readAsDataURL(file)
     e.target.value = ''
+    if (!file) return
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    const objectUrl = URL.createObjectURL(file)
+    objectUrlRef.current = objectUrl
+    setPhotoFile(file)
+    setPhotoPreview(objectUrl)
   }
+
+  const handleRemovePhoto = () => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    objectUrlRef.current = null
+    setPhotoFile(null)
+    setPhotoPreview(null)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    }
+  }, [])
 
   const title = isEditing
     ? 'Edit Tenant'
@@ -305,16 +335,16 @@ export function AddTenantSheet({ open, onOpenChange, existingTenant }: AddTenant
                 onClick={() => fileInputRef.current?.click()}
                 className="relative flex size-20 items-center justify-center overflow-hidden rounded-full border border-dashed border-border/70 bg-muted text-muted-foreground"
               >
-                {photo ? (
-                  <img src={photo} alt="Tenant" className="size-full object-cover" />
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Tenant" className="size-full object-cover" />
                 ) : (
                   <UserRound className="size-8" />
                 )}
               </button>
-              {photo ? (
+              {photoPreview ? (
                 <button
                   type="button"
-                  onClick={() => setPhoto(null)}
+                  onClick={handleRemovePhoto}
                   aria-label="Remove photo"
                   className="-ml-6 -mt-6 flex size-6 items-center justify-center self-start rounded-full bg-danger text-danger-foreground shadow-sm"
                 >
