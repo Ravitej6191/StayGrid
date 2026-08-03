@@ -24,3 +24,8 @@ begin
   delete from broadcasts where building_id = v_building_id;
 end;
 $$;
+
+-- Postgres grants EXECUTE to PUBLIC on new functions by default, but making
+-- it explicit here means this works regardless of any project-level default
+-- privilege changes on the Supabase side.
+grant execute on function clear_app_data() to authenticated;
