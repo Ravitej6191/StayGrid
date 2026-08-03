@@ -20,7 +20,7 @@ const toneClasses: Record<NonNullable<StatCardProps['tone']>, string> = {
 
 export function StatCard({ icon: Icon, label, value, tone = 'neutral' }: StatCardProps) {
   return (
-    <Card className="min-w-0 gap-1.5 p-3">
+    <Card className="press-scale min-w-0 gap-1.5 p-3 transition-transform duration-200 hover:-translate-y-0.5">
       <div className={cn('flex size-7 items-center justify-center rounded-lg', toneClasses[tone])}>
         <Icon className="size-3.5" />
       </div>

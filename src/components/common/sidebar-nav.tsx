@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 export function SidebarNav() {
   return (
-    <aside className="hidden w-60 shrink-0 flex-col border-r border-border/60 bg-card/50 px-3 py-6 backdrop-blur-xl md:flex">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card px-3 py-6 md:flex">
       <ul className="flex flex-col gap-1">
         {bottomNavItems.map((item) => (
           <li key={item.to}>

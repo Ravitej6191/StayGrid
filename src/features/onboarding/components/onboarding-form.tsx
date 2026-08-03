@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard'
 import { getCitiesForState, indianStates } from '@/constants/india-geo'
 import { digitsOnly } from '@/utils/format'
+import { useAuth } from '@/providers/auth-provider'
 import { completeOnboarding } from '../services/onboarding.service'
 
 const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
@@ -38,6 +39,7 @@ type OnboardingFormValues = z.infer<typeof onboardingSchema>
 export function OnboardingForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const {
@@ -56,8 +58,11 @@ export function OnboardingForm() {
       city: '',
       state: '',
       pincode: '',
-      ownerName: '',
-      phone: '',
+      // Google's own consent flow already collected these, so pre-fill from
+      // it — phone is rarely present (Google doesn't share it by default)
+      // but we fill it when it is, per the user's "if not, leave it" ask.
+      ownerName: user?.name ?? '',
+      phone: user?.phone ?? '',
       gstNumber: '',
       panNumber: '',
     },

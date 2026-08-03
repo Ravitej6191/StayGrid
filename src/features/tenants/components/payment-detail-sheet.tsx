@@ -12,15 +12,18 @@ export type HistoryEntry =
       id: string
       amount: number
       date: string
+      createdAt: string
       mode: PaymentMode
       status: RentStatus
       notes: string | null
       receiptNumber: string | null
+      receiptUrl: string | null
     }
   | {
       kind: 'deposit'
       amount: number
       date: string
+      recordedAt: string
       screenshotUrl: string | null
     }
 
@@ -52,8 +55,10 @@ export function PaymentDetailSheet({ entry, open, onOpenChange, onDelete }: Paym
 
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-xs text-muted-foreground">Date</p>
-              <p className="font-medium text-foreground">{formatDateTime(entry.date)}</p>
+              <p className="text-xs text-muted-foreground">Recorded</p>
+              <p className="font-medium text-foreground">
+                {formatDateTime(entry.kind === 'rent' ? entry.createdAt : entry.recordedAt)}
+              </p>
             </div>
             {entry.kind === 'rent' ? (
               <div>
@@ -82,6 +87,17 @@ export function PaymentDetailSheet({ entry, open, onOpenChange, onDelete }: Paym
               <img
                 src={entry.screenshotUrl}
                 alt="Deposit proof"
+                className="max-h-72 w-full rounded-lg border border-border/70 object-cover"
+              />
+            </div>
+          ) : null}
+
+          {entry.kind === 'rent' && entry.receiptUrl ? (
+            <div>
+              <p className="mb-1.5 text-xs text-muted-foreground">Attached photo</p>
+              <img
+                src={entry.receiptUrl}
+                alt="Payment receipt"
                 className="max-h-72 w-full rounded-lg border border-border/70 object-cover"
               />
             </div>

@@ -1,10 +1,10 @@
-import { isSupabaseConfigured } from '@/config/env'
+import { isDemoSession } from '@/config/env'
 import { supabase } from '@/lib/supabase'
 import { clearDemoDb, getDemoDb, seedFromOnboarding, updateBuildingProfile } from '@/lib/demo-store'
 import type { OnboardingInput } from '../types'
 
 export async function getOnboardingStatus(): Promise<boolean> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     return getDemoDb().settings.onboardingCompleted
   }
 
@@ -58,17 +58,35 @@ async function upsertProfileToSupabase(input: OnboardingInput): Promise<void> {
 }
 
 export async function completeOnboarding(input: OnboardingInput): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     seedFromOnboarding(input)
     return
   }
   await upsertProfileToSupabase(input)
 }
 
+/** Lets a user past the onboarding gate without filling the form — building
+ * name is the only column the DB actually requires, everything else can be
+ * filled in later from Settings. */
+export async function skipOnboarding(): Promise<void> {
+  await completeOnboarding({
+    propertyType: 'pg',
+    buildingName: 'My Property',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    ownerName: '',
+    phone: '',
+    gstNumber: null,
+    panNumber: null,
+  })
+}
+
 /** Updates building/owner profile fields without touching the existing
  * floors/rooms/tenants — used by the Settings "edit profile" flow. */
 export async function updateProfile(input: OnboardingInput): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     updateBuildingProfile({
       name: input.buildingName,
       propertyType: input.propertyType,
@@ -86,10 +104,23 @@ export async function updateProfile(input: OnboardingInput): Promise<void> {
   await upsertProfileToSupabase(input)
 }
 
-/** Wipes the owner's building, tenants, payments, and every other record —
- * used by "Clear App Data" and "Delete Account" in Settings. */
+/** Wipes everything the owner has entered since onboarding — floors, rooms,
+ * tenants, payments, expenses, and every other operational record — but
+ * keeps the building profile and `onboarding_completed` flag intact, so a
+ * Google-authenticated owner isn't sent back through onboarding just to
+ * clear their data. Used by "Clear App Data" in Settings (real backend only
+ * — demo mode clears everything via logout instead, see auth-provider). */
+export async function clearAppData(): Promise<void> {
+  // Runs as a single Postgres transaction (see migration 0003) so a failure
+  // partway through can't leave the account half-wiped.
+  const { error } = await supabase.rpc('clear_app_data')
+  if (error) throw error
+}
+
+/** Permanently deletes the owner's building, settings, and (via cascade)
+ * every record tied to them — used by "Delete Account" in Settings. */
 export async function clearAccountData(): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     clearDemoDb()
     return
   }

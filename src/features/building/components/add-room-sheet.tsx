@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -50,7 +50,7 @@ export function AddRoomSheet({ open, onOpenChange, floorId, floorLabel, existing
     defaultValues: {
       roomNumber: '',
       roomType: 'single',
-      bedCount: 4,
+      bedCount: roomTypeOptions.find((o) => o.value === 'single')?.capacity ?? 1,
     },
   })
 
@@ -66,15 +66,17 @@ export function AddRoomSheet({ open, onOpenChange, floorId, floorLabel, existing
       reset({
         roomNumber: '',
         roomType: 'single',
-        bedCount: 4,
+        bedCount: roomTypeOptions.find((o) => o.value === 'single')?.capacity ?? 1,
       })
     }
   }, [open, existingRoom, reset])
 
   const roomType = watch('roomType')
-  const isDorm = roomType === 'dorm'
+  const previousRoomType = useRef(roomType)
 
   useEffect(() => {
+    if (previousRoomType.current === roomType) return
+    previousRoomType.current = roomType
     const typeOption = roomTypeOptions.find((o) => o.value === roomType)
     if (typeOption?.capacity != null) {
       setValue('bedCount', typeOption.capacity)
@@ -83,14 +85,12 @@ export function AddRoomSheet({ open, onOpenChange, floorId, floorLabel, existing
 
   const mutation = useMutation({
     mutationFn: (values: RoomFormValues) => {
-      const typeOption = roomTypeOptions.find((o) => o.value === values.roomType)
-      const capacity = typeOption?.capacity ?? values.bedCount
       if (existingRoom) {
         return updateRoom({
           id: existingRoom.id,
           roomNumber: values.roomNumber,
           roomType: values.roomType,
-          capacity,
+          capacity: values.bedCount,
         })
       }
       if (!floorId) throw new Error('No floor selected')
@@ -98,7 +98,7 @@ export function AddRoomSheet({ open, onOpenChange, floorId, floorLabel, existing
         floorId,
         roomNumber: values.roomNumber,
         roomType: values.roomType,
-        capacity,
+        capacity: values.bedCount,
       })
     },
     onSuccess: async () => {
@@ -148,10 +148,8 @@ export function AddRoomSheet({ open, onOpenChange, floorId, floorLabel, existing
 
           <div className="space-y-1.5">
             <Label htmlFor="bedCount">Number of beds</Label>
-            <Input id="bedCount" type="number" disabled={!isDorm} {...register('bedCount', { valueAsNumber: true })} />
-            {!isDorm ? (
-              <p className="text-xs text-muted-foreground">Bed count follows the room type. Choose Dorm to set a custom count.</p>
-            ) : null}
+            <Input id="bedCount" type="number" {...register('bedCount', { valueAsNumber: true })} />
+            <p className="text-xs text-muted-foreground">Defaults to the room type, but you can adjust it for extra beds.</p>
             {errors.bedCount ? <p className="text-xs text-danger">{errors.bedCount.message}</p> : null}
           </div>
 

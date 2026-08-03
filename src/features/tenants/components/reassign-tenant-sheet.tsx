@@ -43,7 +43,8 @@ export function ReassignTenantSheet({ open, onOpenChange, tenant }: ReassignTena
       toast.success('Tenant reassigned')
       onOpenChange(false)
     },
-    onError: () => toast.error('Could not reassign the tenant. Please try again.'),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : 'Could not reassign the tenant. Please try again.'),
   })
 
   if (!tenant) return null

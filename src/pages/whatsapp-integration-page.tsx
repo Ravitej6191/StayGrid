@@ -7,12 +7,12 @@ import {
   Download,
   Info,
   Loader2,
-  MessageCircle,
   RefreshCw,
   Share2,
   Smartphone,
   X,
 } from 'lucide-react'
+import whatsappLogo from '@/assets/whatsapp-logo.svg'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -56,7 +56,7 @@ export function WhatsAppIntegrationPage() {
   const { data, isLoading } = useWhatsAppStatus(true)
 
   useEffect(() => {
-    if (data && data.status !== 'disconnected') setHasStarted(true)
+    if (data) setHasStarted(data.status !== 'disconnected')
   }, [data])
 
   useEffect(() => {
@@ -136,7 +136,7 @@ export function WhatsAppIntegrationPage() {
 
   return (
     <div className="space-y-4">
-      <Card className="border-border/70 bg-card/80 backdrop-blur-sm">
+      <Card className="border-border">
         <CardContent className="space-y-4">
           {isLoading && !data ? (
             <Skeleton className="h-48 w-full" />
@@ -169,7 +169,7 @@ export function WhatsAppIntegrationPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-card/60">
+      <Card className="border-border">
         <CardContent className="flex items-start gap-3 text-sm text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0 text-info" />
           <p>
@@ -195,8 +195,8 @@ export function WhatsAppIntegrationPage() {
 function DisconnectedView({ onConnect, isPending }: { onConnect: () => void; isPending: boolean }) {
   return (
     <div className="flex flex-col items-center gap-4 py-6 text-center">
-      <span className="flex size-14 items-center justify-center rounded-full bg-success/10 text-success">
-        <MessageCircle className="size-7" />
+      <span className="flex size-14 items-center justify-center rounded-full bg-muted p-2.5">
+        <img src={whatsappLogo} alt="" className="size-full" />
       </span>
       <div className="space-y-1">
         <p className="text-sm font-semibold text-foreground">Connect your WhatsApp</p>

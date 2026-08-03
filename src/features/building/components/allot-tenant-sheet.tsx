@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, UserRound, Users } from 'lucide-react'
+import { Loader2, Search, UserRound, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/common/empty-state'
 import { useTenants } from '@/features/tenants/hooks/use-tenants'
 import { reassignTenant } from '@/features/tenants/services/tenants.service'
@@ -17,7 +19,17 @@ interface AllotTenantSheetProps {
 export function AllotTenantSheet({ open, onOpenChange, room, bed }: AllotTenantSheetProps) {
   const queryClient = useQueryClient()
   const { data: tenants, isLoading } = useTenants()
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    if (!open) setSearch('')
+  }, [open])
+
   const unallotted = (tenants ?? []).filter((t) => t.status === 'active' && t.bedId === null)
+  const query = search.trim().toLowerCase()
+  const filtered = query
+    ? unallotted.filter((t) => t.name.toLowerCase().includes(query) || t.phone.includes(query))
+    : unallotted
 
   const mutation = useMutation({
     mutationFn: (tenantId: string) => reassignTenant(tenantId, bed!.id),
@@ -31,7 +43,8 @@ export function AllotTenantSheet({ open, onOpenChange, room, bed }: AllotTenantS
       toast.success(tenant ? `${tenant.name} allotted` : 'Tenant allotted')
       onOpenChange(false)
     },
-    onError: () => toast.error('Could not allot the tenant. Please try again.'),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : 'Could not allot the tenant. Please try again.'),
   })
 
   return (
@@ -44,15 +57,29 @@ export function AllotTenantSheet({ open, onOpenChange, room, bed }: AllotTenantS
           </SheetTitle>
         </SheetHeader>
 
-        <div className="space-y-2 px-4 pb-8">
+        <div className="space-y-3 px-4 pb-8">
+          {isLoading || unallotted.length === 0 ? null : (
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or phone"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          )}
+
           {isLoading ? null : unallotted.length === 0 ? (
             <EmptyState
               icon={Users}
               title="No unallotted tenants"
               description="Add a tenant from the Tenants tab first, then come back to allot them a bed."
             />
+          ) : filtered.length === 0 ? (
+            <EmptyState icon={Search} title="No matches" description="Try a different search." />
           ) : (
-            unallotted.map((tenant) => (
+            filtered.map((tenant) => (
               <button
                 key={tenant.id}
                 type="button"

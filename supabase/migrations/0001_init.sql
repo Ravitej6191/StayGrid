@@ -153,6 +153,7 @@ create table payments (
   discount numeric(10, 2) not null default 0,
   status rent_status not null default 'paid',
   receipt_number text,
+  receipt_url text,
   notes text,
   created_at timestamptz not null default now()
 );
@@ -237,6 +238,33 @@ create table activities (
 );
 
 -- ---------------------------------------------------------------------
+-- notifications (event-sourced feed backing the bell icon)
+-- ---------------------------------------------------------------------
+create table notifications (
+  id uuid primary key default gen_random_uuid(),
+  building_id uuid not null references building(id) on delete cascade,
+  type text not null,
+  title text not null,
+  message text not null,
+  read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
+-- broadcasts (WhatsApp broadcast send history)
+-- ---------------------------------------------------------------------
+create table broadcasts (
+  id uuid primary key default gen_random_uuid(),
+  building_id uuid not null references building(id) on delete cascade,
+  message text not null,
+  image_url text,
+  audience text not null,
+  recipient_count int not null default 0,
+  delivered_count int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
 -- settings (one row per owner)
 -- ---------------------------------------------------------------------
 create table settings (
@@ -271,6 +299,8 @@ alter table maintenance enable row level security;
 alter table inventory enable row level security;
 alter table documents enable row level security;
 alter table activities enable row level security;
+alter table notifications enable row level security;
+alter table broadcasts enable row level security;
 alter table settings enable row level security;
 
 create policy building_owner_all on building
@@ -376,6 +406,20 @@ create policy activities_owner_all on activities
     exists (select 1 from building b where b.id = activities.building_id and b.owner_id = auth.uid())
   );
 
+create policy notifications_owner_all on notifications
+  for all using (
+    exists (select 1 from building b where b.id = notifications.building_id and b.owner_id = auth.uid())
+  ) with check (
+    exists (select 1 from building b where b.id = notifications.building_id and b.owner_id = auth.uid())
+  );
+
+create policy broadcasts_owner_all on broadcasts
+  for all using (
+    exists (select 1 from building b where b.id = broadcasts.building_id and b.owner_id = auth.uid())
+  ) with check (
+    exists (select 1 from building b where b.id = broadcasts.building_id and b.owner_id = auth.uid())
+  );
+
 create policy settings_owner_all on settings
   for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
@@ -411,3 +455,5 @@ create index maintenance_room_id_idx on maintenance(room_id);
 create index inventory_building_id_idx on inventory(building_id);
 create index documents_tenant_id_idx on documents(tenant_id);
 create index activities_building_id_idx on activities(building_id);
+create index notifications_building_id_idx on notifications(building_id);
+create index broadcasts_building_id_idx on broadcasts(building_id);

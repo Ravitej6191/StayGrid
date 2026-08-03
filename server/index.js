@@ -119,7 +119,9 @@ app.use(
     origin: ALLOWED_ORIGINS,
   }),
 )
-app.use(express.json())
+// Raised from Express's 100kb default — broadcast/receipt images arrive as
+// base64 data URLs when Supabase Storage isn't configured (demo mode).
+app.use(express.json({ limit: '15mb' }))
 
 // Every /api/whatsapp/* route requires a bearer token matching WHATSAPP_SERVER_TOKEN.
 // Without this, anyone who can reach this port could hijack the WhatsApp session,
@@ -209,8 +211,21 @@ function toFullNumber(rawNumber) {
   return digits
 }
 
+/** Builds the Baileys message payload for a text-or-image send. `imageUrl`
+ * may be a real http(s) URL (Supabase Storage) or a base64 data: URL (demo
+ * mode's fallback when no storage bucket is configured) — Baileys can only
+ * fetch http(s) URLs itself, so a data: URL is decoded into a Buffer here. */
+function buildMessagePayload(message, imageUrl) {
+  if (!imageUrl) return { text: message }
+  if (imageUrl.startsWith('data:')) {
+    const base64 = imageUrl.split(',')[1] ?? ''
+    return { image: Buffer.from(base64, 'base64'), caption: message }
+  }
+  return { image: { url: imageUrl }, caption: message }
+}
+
 app.post('/api/whatsapp/send', async (req, res) => {
-  const { to, message } = req.body ?? {}
+  const { to, message, imageUrl } = req.body ?? {}
   if (state.status !== 'connected' || !sock) {
     return res.status(409).json({ ok: false, error: 'WhatsApp is not connected' })
   }
@@ -223,9 +238,10 @@ app.post('/api/whatsapp/send', async (req, res) => {
     if (!result?.exists) {
       return res.status(404).json({ ok: false, error: `${to} is not a WhatsApp number` })
     }
-    await sock.sendMessage(result.jid, { text: message })
+    await sock.sendMessage(result.jid, buildMessagePayload(message, imageUrl))
     res.json({ ok: true })
   } catch (error) {
+    console.error(`[whatsapp] send to ${to} failed:`, error instanceof Error ? error.message : error)
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : 'Failed to send message' })
   }
 })

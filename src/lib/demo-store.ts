@@ -11,6 +11,7 @@ import type {
 } from '@/types/database.types'
 import type { Tenant } from '@/types/domain'
 import { formatCurrency, monthKey as localMonthKey } from '@/utils/format'
+import { areNotificationsEnabled } from './notification-prefs'
 
 /**
  * Local, mutable "demo database" — a single localStorage-persisted JSON
@@ -26,7 +27,7 @@ const BUILDING_ID = 'bld-1'
 
 /** Sums a tenant's payments for the given `forMonth` (YYYY-MM-01) and derives
  * the resulting rent status against their current rent. */
-function computeMonthlyRentStatus(payments: DemoPayment[], tenantId: string, forMonth: string, rent: number): RentStatus {
+export function computeMonthlyRentStatus(payments: DemoPayment[], tenantId: string, forMonth: string, rent: number): RentStatus {
   const total = payments
     .filter((p) => p.tenantId === tenantId && p.forMonth === forMonth)
     .reduce((sum, p) => sum + p.amount, 0)
@@ -99,6 +100,9 @@ export interface DemoDepositRecord {
   amount: number
   paidDate: string
   screenshotUrl: string | null
+  /** When this deposit was actually recorded — distinct from `paidDate`,
+   * which the user can backdate. Carries the real time of day. */
+  recordedAt: string
 }
 
 export interface DemoPayment {
@@ -110,7 +114,11 @@ export interface DemoPayment {
   forMonth: string
   status: RentStatus
   receiptNumber: string | null
+  receiptUrl: string | null
   notes: string | null
+  /** When this payment was actually recorded — distinct from `paymentDate`,
+   * which the user can backdate. Carries the real time of day. */
+  createdAt: string
 }
 
 export interface DemoExpense {
@@ -119,6 +127,10 @@ export interface DemoExpense {
   amount: number
   expenseDate: string
   description: string | null
+  imageUrl: string | null
+  /** When this expense was actually recorded — distinct from `expenseDate`,
+   * which the user can backdate. Carries the real time of day. */
+  createdAt: string
 }
 
 export interface DemoMaintenance {
@@ -134,6 +146,7 @@ export interface DemoMaintenance {
 export interface DemoBroadcast {
   id: string
   message: string
+  imageUrl: string | null
   audience: string
   sentAt: string
   recipientCount: number
@@ -458,6 +471,7 @@ export function resolveTenant(db: DemoDb, demoTenant: DemoTenant): Tenant {
 }
 
 function pushNotification(type: NotificationType, title: string, message: string): void {
+  if (!areNotificationsEnabled()) return
   const notification: DemoNotification = {
     id: crypto.randomUUID(),
     type,
@@ -498,6 +512,12 @@ export interface AddTenantInput {
 }
 
 export function addTenant(input: AddTenantInput): DemoTenant {
+  if (input.bedId) {
+    const db = getDemoDb()
+    const bed = db.beds.find((b) => b.id === input.bedId)
+    if (bed?.status === 'occupied') throw new Error('That bed is already occupied.')
+  }
+
   const tenant: DemoTenant = {
     id: crypto.randomUUID(),
     bedId: input.bedId,
@@ -589,6 +609,10 @@ export function reassignTenant(tenantId: string, newBedId: string): void {
   updateDemoDb((db) => {
     const tenant = db.tenants.find((t) => t.id === tenantId)
     const oldBedId = tenant?.bedId ?? null
+    const targetBed = db.beds.find((b) => b.id === newBedId)
+    if (targetBed?.status === 'occupied' && newBedId !== oldBedId) {
+      throw new Error('That bed is already occupied.')
+    }
     return {
       ...db,
       tenants: db.tenants.map((t) => (t.id === tenantId ? { ...t, bedId: newBedId } : t)),
@@ -601,6 +625,22 @@ export function reassignTenant(tenantId: string, newBedId: string): void {
   })
 }
 
+/** Frees the tenant's bed but keeps them active and unassigned — distinct
+ * from `vacateTenant`, which ends their stay entirely. Lets an owner pull a
+ * tenant out of a room without losing their record (e.g. re-allotting them
+ * elsewhere later). */
+export function unassignTenant(tenantId: string): void {
+  updateDemoDb((db) => {
+    const tenant = db.tenants.find((t) => t.id === tenantId)
+    const bedId = tenant?.bedId ?? null
+    return {
+      ...db,
+      tenants: db.tenants.map((t) => (t.id === tenantId ? { ...t, bedId: null } : t)),
+      beds: db.beds.map((b) => (b.id === bedId ? { ...b, status: 'vacant' } : b)),
+    }
+  })
+}
+
 export function vacateTenant(tenantId: string): void {
   updateDemoDb((db) => {
     const tenant = db.tenants.find((t) => t.id === tenantId)
@@ -608,7 +648,9 @@ export function vacateTenant(tenantId: string): void {
     return {
       ...db,
       tenants: db.tenants.map((t) =>
-        t.id === tenantId ? { ...t, status: 'vacated', vacatingDate: new Date().toISOString().slice(0, 10) } : t,
+        t.id === tenantId
+          ? { ...t, status: 'vacated', vacatingDate: new Date().toISOString().slice(0, 10), bedId: null }
+          : t,
       ),
       beds: db.beds.map((b) => (b.id === bedId ? { ...b, status: 'vacant' } : b)),
     }
@@ -622,6 +664,7 @@ export interface RecordPaymentInput {
   paymentDate: string
   forMonth: string
   notes: string | null
+  receiptUrl: string | null
 }
 
 export function recordPayment(input: RecordPaymentInput): DemoPayment {
@@ -642,7 +685,9 @@ export function recordPayment(input: RecordPaymentInput): DemoPayment {
     forMonth: input.forMonth,
     status,
     receiptNumber: `RCPT-${String(db.payments.length + 1).padStart(4, '0')}`,
+    receiptUrl: input.receiptUrl,
     notes: input.notes,
+    createdAt: new Date().toISOString(),
   }
 
   const currentMonthForMonth = `${localMonthKey(new Date())}-01`
@@ -697,7 +742,15 @@ export function recordDeposit(input: RecordDepositInput): void {
     ...db,
     tenants: db.tenants.map((t) =>
       t.id === input.tenantId
-        ? { ...t, depositRecord: { amount: input.amount, paidDate: input.paidDate, screenshotUrl: input.screenshotUrl } }
+        ? {
+            ...t,
+            depositRecord: {
+              amount: input.amount,
+              paidDate: input.paidDate,
+              screenshotUrl: input.screenshotUrl,
+              recordedAt: new Date().toISOString(),
+            },
+          }
         : t,
     ),
   }))
@@ -710,10 +763,11 @@ export interface AddExpenseInput {
   amount: number
   expenseDate: string
   description: string | null
+  imageUrl: string | null
 }
 
 export function addExpense(input: AddExpenseInput): DemoExpense {
-  const expense: DemoExpense = { id: crypto.randomUUID(), ...input }
+  const expense: DemoExpense = { id: crypto.randomUUID(), ...input, createdAt: new Date().toISOString() }
   updateDemoDb((db) => ({ ...db, expenses: [...db.expenses, expense] }))
   pushNotification('expense', 'Expense added', `${formatCurrency(input.amount)} expense recorded.`)
   return expense
@@ -728,7 +782,14 @@ export function updateExpense(input: UpdateExpenseInput): void {
     ...db,
     expenses: db.expenses.map((e) =>
       e.id === input.id
-        ? { ...e, category: input.category, amount: input.amount, expenseDate: input.expenseDate, description: input.description }
+        ? {
+            ...e,
+            category: input.category,
+            amount: input.amount,
+            expenseDate: input.expenseDate,
+            description: input.description,
+            imageUrl: input.imageUrl,
+          }
         : e,
     ),
   }))
@@ -740,6 +801,7 @@ export function deleteExpense(expenseId: string): void {
 
 export interface SendBroadcastInput {
   message: string
+  imageUrl: string | null
   audience: string
   recipientCount: number
   deliveredCount: number

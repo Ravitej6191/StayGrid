@@ -62,15 +62,19 @@ export interface SendWhatsAppMessageResult {
   error?: string
 }
 
-/** Sends a text message to a single phone number over the connected WhatsApp
- * session. Never throws — failures are reported per-recipient so a broadcast
- * to many tenants can report partial success. */
-export async function sendWhatsAppMessage(to: string, message: string): Promise<SendWhatsAppMessageResult> {
+/** Sends a text (optionally with an image) to a single phone number over the
+ * connected WhatsApp session. Never throws — failures are reported
+ * per-recipient so a broadcast to many tenants can report partial success. */
+export async function sendWhatsAppMessage(
+  to: string,
+  message: string,
+  imageUrl?: string | null,
+): Promise<SendWhatsAppMessageResult> {
   try {
     const response = await fetch(`${BASE_URL}/api/whatsapp/send`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ to, message }),
+      body: JSON.stringify({ to, message, imageUrl: imageUrl ?? undefined }),
     })
     const body = await response.json().catch(() => null)
     if (!response.ok || !body?.ok) {

@@ -56,7 +56,7 @@ export function ExpenseListItem({ expense, onEdit, onDelete }: ExpenseListItemPr
   const Icon = iconByCategory[expense.category]
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/80 p-3 backdrop-blur-sm">
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${colorByCategory[expense.category]}`}>
           <Icon className="size-4" />
@@ -64,7 +64,8 @@ export function ExpenseListItem({ expense, onEdit, onDelete }: ExpenseListItemPr
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground capitalize">{expense.category}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {expense.description || formatDateTime(expense.expenseDate)}
+            {formatDateTime(expense.createdAt)}
+            {expense.description ? ` · ${expense.description}` : ''}
           </p>
         </div>
       </div>

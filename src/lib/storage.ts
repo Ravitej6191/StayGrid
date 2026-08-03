@@ -1,4 +1,4 @@
-import { isSupabaseConfigured } from '@/config/env'
+import { isDemoSession } from '@/config/env'
 import { supabase } from './supabase'
 
 const BUCKET = 'tenant-uploads'
@@ -20,7 +20,7 @@ function fileToDataUrl(file: File): Promise<string> {
  * instead of writing large base64 blobs into `select('*')` rows.
  */
 export async function uploadTenantFile(file: File, folder: string): Promise<string> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     return fileToDataUrl(file)
   }
 

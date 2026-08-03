@@ -1,4 +1,4 @@
-import { isSupabaseConfigured } from '@/config/env'
+import { isDemoSession } from '@/config/env'
 import { supabase } from '@/lib/supabase'
 import {
   addFloor as demoAddFloor,
@@ -134,7 +134,12 @@ function mapTenantRow(row: TenantRow, roomId: string, roomNumber: string, floorN
     notes: row.notes,
     depositRecord:
       row.deposit_paid_amount !== null
-        ? { amount: row.deposit_paid_amount, paidDate: row.deposit_paid_date ?? '', screenshotUrl: row.deposit_screenshot_url }
+        ? {
+            amount: row.deposit_paid_amount,
+            paidDate: row.deposit_paid_date ?? '',
+            screenshotUrl: row.deposit_screenshot_url,
+            recordedAt: row.deposit_recorded_at ?? row.deposit_paid_date ?? '',
+          }
         : null,
   }
 }
@@ -149,8 +154,9 @@ async function fetchFromSupabase(): Promise<BuildingData> {
     .from('building')
     .select('*')
     .eq('owner_id', user.id)
-    .single()
+    .maybeSingle()
   if (buildingError) throw buildingError
+  if (!buildingRow) throw new Error('No building found for this account')
 
   const { data: settingsRow, error: settingsError } = await supabase
     .from('settings')
@@ -276,14 +282,14 @@ async function fetchFromSupabase(): Promise<BuildingData> {
 }
 
 export async function getBuildingData(): Promise<BuildingData> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     return getDemoData()
   }
   return fetchFromSupabase()
 }
 
 export async function createFloor(input: AddFloorInput): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     demoAddFloor(input)
     return
   }
@@ -307,7 +313,7 @@ export async function createFloor(input: AddFloorInput): Promise<void> {
 }
 
 export async function updateFloor(floorId: string, name: string): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     demoUpdateFloor(floorId, name)
     return
   }
@@ -317,7 +323,7 @@ export async function updateFloor(floorId: string, name: string): Promise<void> 
 }
 
 export async function deleteFloor(floorId: string): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     demoDeleteFloor(floorId)
     return
   }
@@ -347,7 +353,7 @@ export async function deleteFloor(floorId: string): Promise<void> {
 }
 
 export async function createRoom(input: AddRoomInput): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     demoAddRoom(input)
     return
   }
@@ -374,7 +380,7 @@ export async function createRoom(input: AddRoomInput): Promise<void> {
 }
 
 export async function updateRoom(input: UpdateRoomInput): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     demoUpdateRoom(input)
     return
   }
@@ -423,7 +429,7 @@ export async function updateRoom(input: UpdateRoomInput): Promise<void> {
 }
 
 export async function deleteRoom(roomId: string): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     demoDeleteRoom(roomId)
     return
   }

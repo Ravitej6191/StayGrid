@@ -118,6 +118,7 @@ export type TenantRow = {
   deposit_paid_amount: number | null
   deposit_paid_date: string | null
   deposit_screenshot_url: string | null
+  deposit_recorded_at: string | null
   created_at: string
   updated_at: string
 }
@@ -133,6 +134,7 @@ export type PaymentRow = {
   discount: number
   status: RentStatus
   receipt_number: string | null
+  receipt_url: string | null
   notes: string | null
   created_at: string
 }
@@ -197,6 +199,27 @@ export type ActivityRow = {
   created_at: string
 }
 
+export type NotificationRow = {
+  id: string
+  building_id: string
+  type: string
+  title: string
+  message: string
+  read: boolean
+  created_at: string
+}
+
+export type BroadcastRow = {
+  id: string
+  building_id: string
+  message: string
+  image_url: string | null
+  audience: string
+  recipient_count: number
+  delivered_count: number
+  created_at: string
+}
+
 export type SettingsRow = {
   id: string
   owner_id: string
@@ -231,10 +254,17 @@ export type Database = {
       inventory: TableDef<InventoryRow>
       documents: TableDef<DocumentRow>
       activities: TableDef<ActivityRow>
+      notifications: TableDef<NotificationRow>
+      broadcasts: TableDef<BroadcastRow>
       settings: TableDef<SettingsRow>
     }
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: {
+      clear_app_data: {
+        Args: Record<PropertyKey, never>
+        Returns: void
+      }
+    }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }
   }

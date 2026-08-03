@@ -38,4 +38,7 @@ export interface DepositRecord {
   amount: number
   paidDate: string
   screenshotUrl: string | null
+  /** When this deposit was actually recorded — distinct from `paidDate`,
+   * which the user can backdate. Carries the real time of day. */
+  recordedAt: string
 }

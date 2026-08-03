@@ -3,4 +3,5 @@ export interface AuthUser {
   email: string
   name: string
   photoUrl: string | null
+  phone: string | null
 }

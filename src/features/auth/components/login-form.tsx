@@ -84,7 +84,7 @@ export function LoginForm() {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: 'easeOut' }}
-            className="mt-6 w-full space-y-5 rounded-xl border border-white/10 bg-card/70 p-6 shadow-2xl shadow-black/5 backdrop-blur-xl dark:shadow-black/30"
+            className="mt-6 w-full space-y-5 rounded-xl border border-border bg-card p-6 shadow-xl shadow-black/5 dark:shadow-black/30"
           >
             <p className="text-center text-sm text-muted-foreground">Sign in to manage your building</p>
 

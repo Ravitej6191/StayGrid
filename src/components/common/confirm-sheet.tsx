@@ -27,7 +27,7 @@ export function ConfirmSheet({
 }: ConfirmSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-xl">
+      <SheetContent side="bottom">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -39,7 +39,7 @@ export function ConfirmSheet({
           <Button
             type="button"
             variant={destructive ? 'destructive' : 'default'}
-            className="flex-1"
+            className="flex-1 shadow-md"
             disabled={isPending}
             onClick={onConfirm}
           >

@@ -1,4 +1,4 @@
-import { isSupabaseConfigured } from '@/config/env'
+import { isDemoSession } from '@/config/env'
 import { supabase } from '@/lib/supabase'
 import {
   addExpense as demoAddExpense,
@@ -8,10 +8,12 @@ import {
   type AddExpenseInput,
   type UpdateExpenseInput,
 } from '@/lib/demo-store'
+import { pushSupabaseNotification } from '@/features/notifications/services/notifications.service'
+import { formatCurrency } from '@/utils/format'
 import type { Expense } from '../types'
 
 export async function getExpenses(): Promise<Expense[]> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     return getDemoDb()
       .expenses.map((e) => ({
         id: e.id,
@@ -19,6 +21,8 @@ export async function getExpenses(): Promise<Expense[]> {
         amount: e.amount,
         expenseDate: e.expenseDate,
         description: e.description,
+        imageUrl: e.imageUrl,
+        createdAt: e.createdAt,
       }))
       .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate))
   }
@@ -37,7 +41,7 @@ export async function getExpenses(): Promise<Expense[]> {
 
   const { data, error } = await supabase
     .from('expenses')
-    .select('id, category, amount, expense_date, description')
+    .select('id, category, amount, expense_date, description, invoice_url, created_at')
     .eq('building_id', buildingRow.id)
     .order('expense_date', { ascending: false })
   if (error) throw error
@@ -48,13 +52,15 @@ export async function getExpenses(): Promise<Expense[]> {
     amount: e.amount,
     expenseDate: e.expense_date,
     description: e.description,
+    imageUrl: e.invoice_url,
+    createdAt: e.created_at,
   }))
 }
 
 export type CreateExpenseInput = AddExpenseInput
 
 export async function createExpense(input: CreateExpenseInput): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     demoAddExpense(input)
     return
   }
@@ -77,14 +83,22 @@ export async function createExpense(input: CreateExpenseInput): Promise<void> {
     amount: input.amount,
     expense_date: input.expenseDate,
     description: input.description,
+    invoice_url: input.imageUrl,
   })
   if (error) throw error
+
+  await pushSupabaseNotification(
+    buildingRow.id,
+    'expense',
+    'Expense added',
+    `${formatCurrency(input.amount)} expense recorded.`,
+  )
 }
 
 export type EditExpenseInput = UpdateExpenseInput
 
 export async function updateExpense(input: EditExpenseInput): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     demoUpdateExpense(input)
     return
   }
@@ -96,13 +110,14 @@ export async function updateExpense(input: EditExpenseInput): Promise<void> {
       amount: input.amount,
       expense_date: input.expenseDate,
       description: input.description,
+      invoice_url: input.imageUrl,
     })
     .eq('id', input.id)
   if (error) throw error
 }
 
 export async function deleteExpense(expenseId: string): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     demoDeleteExpense(expenseId)
     return
   }

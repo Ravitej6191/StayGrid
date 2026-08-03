@@ -1,12 +1,8 @@
-import { isSupabaseConfigured } from '@/config/env'
+import { isDemoSession } from '@/config/env'
 import { supabase } from '@/lib/supabase'
 import { getDemoDb } from '@/lib/demo-store'
-import { monthKey as monthKeyOf } from '@/utils/format'
+import { monthKey as monthKeyOf, monthKeyOfDateString as monthKey } from '@/utils/format'
 import type { DashboardData, IncomeExpenseTrendPoint } from '../types'
-
-function monthKey(dateStr: string): string {
-  return dateStr.slice(0, 7) // YYYY-MM
-}
 
 function currentMonthKey(): string {
   return monthKeyOf(new Date())
@@ -99,25 +95,44 @@ async function fetchFromSupabase(): Promise<DashboardData> {
 
   const sum = (rows: { amount: number }[] | null) => (rows ?? []).reduce((s, r) => s + r.amount, 0)
 
-  const [monthPayments, monthExpenses, tenants, bedCountResult, earliestPayment, earliestExpense] = await Promise.all([
-    supabase.from('payments').select('amount').gte('payment_date', startOfMonthIso()),
-    supabase
-      .from('expenses')
-      .select('amount')
-      .eq('building_id', buildingRow.id)
-      .gte('expense_date', startOfMonthIso()),
-    supabase.from('tenants').select('id, rent, rent_status, status, deposit_paid_amount').eq('building_id', buildingRow.id),
-    supabase.from('beds').select('id', { count: 'exact', head: true }),
-    supabase.from('payments').select('payment_date').order('payment_date', { ascending: true }).limit(1),
-    supabase
-      .from('expenses')
-      .select('expense_date')
-      .eq('building_id', buildingRow.id)
-      .order('expense_date', { ascending: true })
-      .limit(1),
-  ])
+  // Tenant ids are needed up front to scope the payments queries below (the
+  // payments table has no building_id column of its own — it's reached only
+  // through tenant_id — so fetching this first, rather than in parallel,
+  // avoids relying solely on RLS for building isolation).
+  const { data: tenantRows, error: tenantsError } = await supabase
+    .from('tenants')
+    .select('id, rent, rent_status, status, deposit_paid_amount')
+    .eq('building_id', buildingRow.id)
+  if (tenantsError) throw tenantsError
+  const tenantIds = tenantRows.map((t) => t.id)
+  // .in('tenant_id', []) is unreliable across PostgREST versions when the
+  // list is empty, so short-circuit to an empty result instead.
+  const noPayments = () => Promise.resolve({ data: [] as never[], error: null })
 
-  const activeTenants = (tenants.data ?? []).filter((t) => t.status === 'active')
+  const [monthPayments, monthExpenses, bedCountResult, occupiedBedCountResult, earliestPayment, earliestExpense] =
+    await Promise.all([
+      tenantIds.length > 0
+        ? supabase.from('payments').select('amount').in('tenant_id', tenantIds).gte('payment_date', startOfMonthIso())
+        : noPayments(),
+      supabase
+        .from('expenses')
+        .select('amount')
+        .eq('building_id', buildingRow.id)
+        .gte('expense_date', startOfMonthIso()),
+      supabase.from('beds').select('id', { count: 'exact', head: true }),
+      supabase.from('beds').select('id', { count: 'exact', head: true }).eq('status', 'occupied'),
+      tenantIds.length > 0
+        ? supabase.from('payments').select('payment_date').in('tenant_id', tenantIds).order('payment_date', { ascending: true }).limit(1)
+        : noPayments(),
+      supabase
+        .from('expenses')
+        .select('expense_date')
+        .eq('building_id', buildingRow.id)
+        .order('expense_date', { ascending: true })
+        .limit(1),
+    ])
+
+  const activeTenants = tenantRows.filter((t) => t.status === 'active')
   const pendingRent = activeTenants
     .filter((t) => t.rent_status === 'pending')
     .reduce((s, t) => s + t.rent, 0)
@@ -126,7 +141,8 @@ async function fetchFromSupabase(): Promise<DashboardData> {
   const thisMonthTotal = sum(monthPayments.data)
   const monthlyExpense = sum(monthExpenses.data)
   const totalBeds = bedCountResult.count ?? 0
-  const occupancyPercent = totalBeds ? Math.round((activeTenants.length / totalBeds) * 100) : 0
+  const occupiedBeds = occupiedBedCountResult.count ?? 0
+  const occupancyPercent = totalBeds ? Math.round((occupiedBeds / totalBeds) * 100) : 0
 
   const earliestDate = [earliestPayment.data?.[0]?.payment_date, earliestExpense.data?.[0]?.expense_date]
     .filter((d): d is string => Boolean(d))
@@ -139,7 +155,9 @@ async function fetchFromSupabase(): Promise<DashboardData> {
     const from = new Date(year!, (month ?? 1) - 1, 1).toISOString().slice(0, 10)
     const to = new Date(year!, month ?? 1, 1).toISOString().slice(0, 10)
     const [inc, exp] = await Promise.all([
-      supabase.from('payments').select('amount').gte('payment_date', from).lt('payment_date', to),
+      tenantIds.length > 0
+        ? supabase.from('payments').select('amount').in('tenant_id', tenantIds).gte('payment_date', from).lt('payment_date', to)
+        : noPayments(),
       supabase
         .from('expenses')
         .select('amount')
@@ -160,7 +178,7 @@ async function fetchFromSupabase(): Promise<DashboardData> {
       pendingRent,
       monthlyExpense,
       occupancyPercent,
-      vacantCount: totalBeds - activeTenants.length,
+      vacantCount: totalBeds - occupiedBeds,
       pendingDepositsCount,
     },
     trend,
@@ -168,7 +186,7 @@ async function fetchFromSupabase(): Promise<DashboardData> {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  if (!isSupabaseConfigured) {
+  if (isDemoSession()) {
     return getDemoData()
   }
   return fetchFromSupabase()

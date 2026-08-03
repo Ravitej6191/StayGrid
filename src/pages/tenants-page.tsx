@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Users } from 'lucide-react'
 import { EmptyState } from '@/components/common/empty-state'
 import { ErrorState } from '@/components/common/error-state'
@@ -9,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useTenants } from '@/features/tenants/hooks/use-tenants'
 import { TenantListItem } from '@/features/tenants/components/tenant-list-item'
-import { AddTenantSheet } from '@/features/tenants/components/add-tenant-sheet'
 import { usePageTitle } from '@/hooks/use-page-title'
 
 const filters = [
@@ -22,9 +22,9 @@ const filters = [
 type FilterValue = (typeof filters)[number]['value']
 
 export function TenantsPage() {
-  usePageTitle('Tenants')
+  const navigate = useNavigate()
+  usePageTitle('Tenants', () => navigate(-1))
   const { data: tenants, isLoading, isError, refetch } = useTenants()
-  const [addOpen, setAddOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterValue>('all')
 
@@ -45,33 +45,37 @@ export function TenantsPage() {
     <>
       <PullToRefresh onRefresh={refetch}>
         <div className="space-y-4">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or phone"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+          {activeTenants.length > 0 ? (
+            <>
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or phone"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
 
-          <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-            {filters.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setFilter(f.value)}
-                className={cn(
-                  'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors',
-                  filter === f.value
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border/70 text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+              <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+                {filters.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => setFilter(f.value)}
+                    className={cn(
+                      'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors',
+                      filter === f.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border/70 text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
 
           {isError ? (
             <ErrorState title="Couldn't load tenants" description="Please try again." onRetry={() => refetch()} />
@@ -96,12 +100,10 @@ export function TenantsPage() {
               ))}
             </div>
           )}
-
-          <AddTenantSheet open={addOpen} onOpenChange={setAddOpen} />
         </div>
       </PullToRefresh>
 
-      <Fab onClick={() => setAddOpen(true)}>
+      <Fab onClick={() => navigate('/tenants/new')}>
         <Plus className="size-6" />
       </Fab>
     </>

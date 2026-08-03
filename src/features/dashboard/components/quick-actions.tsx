@@ -29,7 +29,7 @@ export function QuickActions({ onRecordPayment, onAddTenant, onAddExpense, onBro
           key={action.label}
           type="button"
           onClick={action.onClick}
-          className="flex flex-col items-center gap-2 rounded-xl border border-border/70 bg-card/70 px-2 py-3 text-center backdrop-blur-sm transition-colors active:bg-accent"
+          className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card px-2 py-3 text-center transition-colors active:bg-accent"
         >
           <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
             <action.icon className="size-4" />

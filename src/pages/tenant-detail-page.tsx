@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Briefcase, ChevronRight, Droplet, IdCard, Pencil, Phone, Repeat, ShieldCheck, UserX } from 'lucide-react'
+import { Briefcase, ChevronRight, Droplet, IdCard, IndianRupee, Pencil, Phone, Repeat, ShieldCheck, UserX } from 'lucide-react'
 import { ErrorState } from '@/components/common/error-state'
 import { StatusChip } from '@/components/common/status-chip'
 import { PullToRefresh } from '@/components/common/pull-to-refresh'
@@ -13,21 +13,17 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmSheet } from '@/components/common/confirm-sheet'
 import { useTenant, usePaymentHistory } from '@/features/tenants/hooks/use-tenant'
-import { RecordPaymentSheet } from '@/features/tenants/components/record-payment-sheet'
-import { AddTenantSheet } from '@/features/tenants/components/add-tenant-sheet'
 import { ReassignTenantSheet } from '@/features/tenants/components/reassign-tenant-sheet'
 import { VacateTenantDialog } from '@/features/tenants/components/vacate-tenant-dialog'
 import { PaymentDetailSheet, type HistoryEntry } from '@/features/tenants/components/payment-detail-sheet'
 import { deletePayment } from '@/features/tenants/services/tenants.service'
 import { rentStatusTokens } from '@/constants/status'
-import { formatCurrency, formatDateTime } from '@/utils/format'
+import { formatAadhaar, formatCurrency, formatDate, formatDateTime } from '@/utils/format'
 import { usePageTitle } from '@/hooks/use-page-title'
 
 function initials(name: string) {
   return name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()
 }
-
-const formatDate = formatDateTime
 
 export function TenantDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -35,8 +31,6 @@ export function TenantDetailPage() {
   const queryClient = useQueryClient()
   const { data: tenant, isLoading, isError, refetch } = useTenant(id)
   const { data: payments } = usePaymentHistory(id)
-  const [paymentOpen, setPaymentOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
   const [reassignOpen, setReassignOpen] = useState(false)
   const [vacateOpen, setVacateOpen] = useState(false)
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null)
@@ -85,10 +79,12 @@ export function TenantDetailPage() {
         id: p.id,
         amount: p.amount,
         date: p.paymentDate,
+        createdAt: p.createdAt,
         mode: p.paymentMode,
         status: p.status,
         notes: p.notes,
         receiptNumber: p.receiptNumber,
+        receiptUrl: p.receiptUrl,
       }),
     ),
     ...(tenant.depositRecord
@@ -97,6 +93,7 @@ export function TenantDetailPage() {
             kind: 'deposit' as const,
             amount: tenant.depositRecord.amount,
             date: tenant.depositRecord.paidDate,
+            recordedAt: tenant.depositRecord.recordedAt,
             screenshotUrl: tenant.depositRecord.screenshotUrl,
           },
         ]
@@ -104,32 +101,10 @@ export function TenantDetailPage() {
   ].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
+    <>
     <PullToRefresh onRefresh={refetch}>
-      <div className="space-y-4">
-        {isActive ? (
-          <div className="flex gap-2">
-            <Button className="flex-1" onClick={() => setPaymentOpen(true)}>
-              Record Payment
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => setEditOpen(true)} aria-label="Edit tenant">
-              <Pencil className="size-4" />
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => setReassignOpen(true)} aria-label="Reassign room">
-              <Repeat className="size-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="text-danger hover:text-danger"
-              onClick={() => setVacateOpen(true)}
-              aria-label="Vacate tenant"
-            >
-              <UserX className="size-4" />
-            </Button>
-          </div>
-        ) : null}
-
-        <Card className="gap-3 border-border/70 bg-card/80 p-4 backdrop-blur-sm">
+      <div className={isActive ? 'space-y-4 pb-20' : 'space-y-4'}>
+        <Card className="gap-3 border-border p-4">
           <div className="flex items-center gap-3">
             <Avatar className="size-14">
               {tenant.photoUrl ? <AvatarImage src={tenant.photoUrl} alt={tenant.name} /> : null}
@@ -152,22 +127,27 @@ export function TenantDetailPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3 rounded-lg bg-muted/50 p-3 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Rent</p>
-              <p className="font-numeric font-semibold text-foreground">{formatCurrency(tenant.rent)}</p>
-              {isActive ? <StatusChip token={rentToken} className="mt-1" /> : null}
+          <div className="grid grid-cols-2 divide-x divide-border rounded-lg bg-muted/50 text-sm">
+            <div className="flex flex-col gap-1.5 p-3">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <IndianRupee className="size-3.5" />
+                Rent
+              </div>
+              <p className="font-numeric text-lg font-semibold text-foreground">{formatCurrency(tenant.rent)}</p>
+              {isActive ? <StatusChip token={rentToken} /> : null}
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Deposit</p>
-              <p className="font-numeric font-semibold text-foreground">{formatCurrency(tenant.deposit)}</p>
+            <div className="flex flex-col gap-1.5 p-3">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ShieldCheck className="size-3.5" />
+                Deposit
+              </div>
+              <p className="font-numeric text-lg font-semibold text-foreground">{formatCurrency(tenant.deposit)}</p>
               <StatusChip
                 token={
                   tenant.depositRecord
                     ? { label: 'Paid', dot: 'bg-success', badge: 'bg-success/15 text-success border-success/30' }
                     : { label: 'Pending', dot: 'bg-danger', badge: 'bg-danger/15 text-danger border-danger/30' }
                 }
-                className="mt-1"
               />
             </div>
           </div>
@@ -180,7 +160,7 @@ export function TenantDetailPage() {
             </div>
             {tenant.aadhaarNumber ? (
               <div className="flex items-center gap-2">
-                <IdCard className="size-3.5 shrink-0" /> {tenant.aadhaarNumber}
+                <IdCard className="size-3.5 shrink-0" /> {formatAadhaar(tenant.aadhaarNumber)}
               </div>
             ) : null}
             {tenant.occupation ? (
@@ -206,7 +186,6 @@ export function TenantDetailPage() {
               {isActive
                 ? `Joined ${formatDate(tenant.joiningDate)}`
                 : `${formatDate(tenant.joiningDate)} — ${tenant.vacatingDate ? formatDate(tenant.vacatingDate) : ''}`}
-              {tenant.depositRecord ? ` · Deposit paid ${formatDate(tenant.depositRecord.paidDate)}` : ''}
             </p>
           </div>
         </Card>
@@ -222,12 +201,14 @@ export function TenantDetailPage() {
                   key={entry.kind === 'rent' ? entry.id : 'deposit'}
                   type="button"
                   onClick={() => setSelectedEntry(entry)}
-                  className="flex w-full items-center justify-between rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+                  className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:bg-accent"
                 >
                   <div>
                     <p className="text-sm font-medium text-foreground">{formatCurrency(entry.amount)}</p>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {entry.kind === 'deposit' ? 'Deposit' : entry.mode.replace('_', ' ')} · {formatDate(entry.date)}
+                    <p className="text-xs text-muted-foreground">
+                      <span className="capitalize">{entry.kind === 'deposit' ? 'Deposit' : entry.mode.replace('_', ' ')}</span>
+                      {' · '}
+                      {formatDateTime(entry.kind === 'rent' ? entry.createdAt : entry.recordedAt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -254,8 +235,6 @@ export function TenantDetailPage() {
           }}
         />
 
-        <RecordPaymentSheet open={paymentOpen} onOpenChange={setPaymentOpen} defaultTenantId={tenant.id} />
-        <AddTenantSheet open={editOpen} onOpenChange={setEditOpen} existingTenant={tenant} />
         <ReassignTenantSheet open={reassignOpen} onOpenChange={setReassignOpen} tenant={tenant} />
         <VacateTenantDialog open={vacateOpen} onOpenChange={setVacateOpen} tenant={tenant} onVacated={() => navigate(-1)} />
 
@@ -272,5 +251,28 @@ export function TenantDetailPage() {
         />
       </div>
     </PullToRefresh>
+    {isActive ? (
+      <div className="fixed inset-x-0 bottom-16 z-30 flex items-center gap-2 border-t border-border bg-card px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-0">
+        <Button
+          variant="outline"
+          size="icon"
+          className="text-danger hover:text-danger"
+          onClick={() => setVacateOpen(true)}
+          aria-label="Vacate tenant"
+        >
+          <UserX className="size-4" />
+        </Button>
+        <Button variant="outline" size="icon" onClick={() => setReassignOpen(true)} aria-label="Reassign room">
+          <Repeat className="size-4" />
+        </Button>
+        <Button variant="outline" size="icon" onClick={() => navigate(`/tenants/${tenant.id}/edit`)} aria-label="Edit tenant">
+          <Pencil className="size-4" />
+        </Button>
+        <Button className="flex-1" onClick={() => navigate(`/tenants/record-payment?tenantId=${tenant.id}`)}>
+          Record Payment
+        </Button>
+      </div>
+    ) : null}
+    </>
   )
 }

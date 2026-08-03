@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, CircleDot, Pencil, Plus, Trash2 } from 'lucide-react'
+import { BedDouble, Building2, CircleDashed, Pencil, Plus, Trash2, Users } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { ErrorState } from '@/components/common/error-state'
 import { EmptyState } from '@/components/common/empty-state'
 import { PullToRefresh } from '@/components/common/pull-to-refresh'
@@ -20,8 +21,8 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import type { Bed, Floor, Room } from '@/features/building/types'
 
 export function BuildingPage() {
-  usePageTitle('Building')
   const navigate = useNavigate()
+  usePageTitle('Building', () => navigate(-1))
   const { data, isLoading, isError, refetch } = useBuildingData()
   const selectedRoomId = useUiStore((s) => s.selectedRoomId)
   const setSelectedRoomId = useUiStore((s) => s.setSelectedRoomId)
@@ -91,13 +92,13 @@ export function BuildingPage() {
         ) : (
           <>
             <div className="grid grid-cols-4 gap-2">
-              <KpiTile label="Occupied" value={kpis.occupied} dotClassName="bg-success" />
-              <KpiTile label="Partial" value={kpis.partial} dotClassName="bg-warning" />
-              <KpiTile label="Vacant" value={kpis.vacant} dotClassName="bg-neutral" />
+              <KpiTile label="Occupied" value={kpis.occupied} icon={Users} tone="text-success" />
+              <KpiTile label="Partial" value={kpis.partial} icon={CircleDashed} tone="text-warning" />
+              <KpiTile label="Vacant" value={kpis.vacant} icon={BedDouble} tone="text-neutral-foreground" />
               <button
                 type="button"
                 onClick={() => setAddFloorOpen(true)}
-                className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border/70 bg-card/60 py-2.5 text-primary transition-colors hover:bg-accent"
+                className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-card py-2.5 text-primary transition-colors hover:bg-accent"
               >
                 <Plus className="size-4" />
                 <span className="text-[11px] font-medium">Add Floor</span>
@@ -109,7 +110,7 @@ export function BuildingPage() {
                 <AccordionItem
                   key={floor.id}
                   value={floor.id}
-                  className="rounded-xl border border-border/70 bg-card/60 px-3 last:border-b"
+                  className="rounded-xl border border-border bg-card px-3 last:border-b"
                 >
                   <div className="flex items-center gap-1 py-1.5">
                     <span className="flex flex-1 items-baseline gap-2 py-1.5">
@@ -135,14 +136,6 @@ export function BuildingPage() {
                       >
                         <Trash2 className="size-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setAddRoomFloor(floor)}
-                        aria-label="Add room"
-                        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        <Plus className="size-3.5" />
-                      </button>
                       <AccordionTrigger className="w-auto p-1.5 hover:no-underline" />
                     </div>
                   </div>
@@ -160,7 +153,11 @@ export function BuildingPage() {
                         }
                       />
                     ) : (
-                      <RoomGrid rooms={floor.rooms} onSelectRoom={setSelectedRoomId} />
+                      <RoomGrid
+                        rooms={floor.rooms}
+                        onSelectRoom={setSelectedRoomId}
+                        onAddRoom={() => setAddRoomFloor(floor)}
+                      />
                     )}
                   </AccordionContent>
                 </AccordionItem>
@@ -241,11 +238,21 @@ export function BuildingPage() {
   )
 }
 
-function KpiTile({ label, value, dotClassName }: { label: string; value: number; dotClassName: string }) {
+function KpiTile({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string
+  value: number
+  icon: LucideIcon
+  tone: string
+}) {
   return (
-    <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-border/70 bg-card/60 py-2.5">
-      <span className="flex items-center gap-1">
-        <CircleDot className={`size-2.5 ${dotClassName}`} />
+    <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-border bg-card py-2.5">
+      <span className="flex items-center gap-1.5">
+        <Icon className={`size-3.5 ${tone}`} />
         <span className="font-numeric text-sm font-semibold text-foreground">{value}</span>
       </span>
       <span className="text-[11px] text-muted-foreground">{label}</span>

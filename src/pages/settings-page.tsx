@@ -5,13 +5,12 @@ import { useTheme } from 'next-themes'
 import {
   Bell,
   Building2,
-  Check,
   ChevronRight,
   Globe,
   Lock,
   LogOut,
-  MessageCircle,
   Moon,
+  Palette,
   Pencil,
   ShieldAlert,
   Sun,
@@ -19,52 +18,53 @@ import {
   Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import whatsappLogo from '@/assets/whatsapp-logo.svg'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ConfirmSheet } from '@/components/common/confirm-sheet'
-import { cn } from '@/lib/utils'
+import { SetPinSheet } from '@/features/settings/components/set-pin-sheet'
 import { useBuildingData } from '@/features/building/hooks/use-building-data'
-import { clearAccountData } from '@/features/onboarding/services/onboarding.service'
+import { clearAccountData, clearAppData } from '@/features/onboarding/services/onboarding.service'
 import { applyThemeColor, getStoredThemeColor, themeColorPresets } from '@/constants/theme-colors'
+import { NOTIFICATIONS_ENABLED_KEY, areNotificationsEnabled } from '@/lib/notification-prefs'
 import { APP_VERSION } from '@/constants/app'
 import { useAuth } from '@/providers/auth-provider'
+import { useAppLockStore } from '@/store/app-lock-store'
 import { usePageTitle } from '@/hooks/use-page-title'
 
-const NOTIFICATIONS_KEY = 'staygrid.notificationsEnabled'
-const APP_LOCK_KEY = 'staygrid.appLockEnabled'
-
-function readBooleanPref(key: string, fallback: boolean) {
-  const raw = localStorage.getItem(key)
-  return raw === null ? fallback : raw === 'true'
-}
+const languageOptions = [
+  { value: 'en', label: 'English', comingSoon: false },
+  { value: 'hi', label: 'Hindi', comingSoon: true },
+  { value: 'te', label: 'Telugu', comingSoon: true },
+  { value: 'ta', label: 'Tamil', comingSoon: true },
+]
 
 export function SettingsPage() {
-  usePageTitle('Settings')
   const navigate = useNavigate()
+  usePageTitle('Settings', () => navigate(-1))
   const queryClient = useQueryClient()
   const { theme, setTheme } = useTheme()
   const { data } = useBuildingData()
   const { user, isDemoMode, logout } = useAuth()
   const [clearDataOpen, setClearDataOpen] = useState(false)
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => readBooleanPref(NOTIFICATIONS_KEY, true))
-  const [appLockEnabled, setAppLockEnabled] = useState(() => readBooleanPref(APP_LOCK_KEY, false))
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => areNotificationsEnabled())
+  const appLockEnabled = useAppLockStore((s) => s.enabled)
+  const disableAppLock = useAppLockStore((s) => s.disable)
+  const [setPinOpen, setSetPinOpen] = useState(false)
+  const [disableLockOpen, setDisableLockOpen] = useState(false)
   const [themeColor, setThemeColor] = useState(() => getStoredThemeColor())
+  const [language, setLanguage] = useState('en')
 
   const clearDataMutation = useMutation({
-    mutationFn: clearAccountData,
+    mutationFn: clearAppData,
     onSuccess: () => {
-      if (isDemoMode) {
-        void logout()
-        toast.success('App data cleared')
-        return
-      }
       queryClient.clear()
-      toast.success('Data cleared. Let\'s set up your property again.')
-      navigate('/onboarding', { replace: true })
+      toast.success('App data cleared')
     },
     onError: () => toast.error('Could not clear your data. Please try again.'),
   })
@@ -80,7 +80,7 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-5">
-      <Card className="border-border/70 bg-card/80 backdrop-blur-sm">
+      <Card className="border-border">
         <CardContent className="space-y-4">
           {data ? (
             <>
@@ -139,154 +139,165 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/70 bg-card/80 backdrop-blur-sm">
-        <CardContent className="space-y-4">
+      <Card className="border-border">
+        <CardContent className="space-y-3">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Preferences</p>
 
-          <div>
-            <p className="mb-2 text-sm text-foreground">Appearance</p>
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  { value: 'light', label: 'Light', icon: Sun },
-                  { value: 'dark', label: 'Dark', icon: Moon },
-                ] as const
-              ).map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setTheme(option.value)}
-                  className={cn(
-                    'flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors',
-                    theme === option.value && 'border-primary bg-primary/10 text-primary',
-                  )}
-                >
-                  <option.icon className="size-4" />
-                  {option.label}
-                </button>
-              ))}
+          <div className="-my-1 divide-y divide-border">
+            <div className="flex w-full items-center gap-2.5 py-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                {theme === 'dark' ? <Moon className="size-4" /> : <Sun className="size-4" />}
+              </span>
+              <span className="flex-1 text-sm font-medium text-foreground">Appearance</span>
+              <Select value={theme} onValueChange={setTheme}>
+                <SelectTrigger size="sm" className="w-[110px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value="light">
+                    <Sun className="size-4" />
+                    Light
+                  </SelectItem>
+                  <SelectItem value="dark">
+                    <Moon className="size-4" />
+                    Dark
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
 
-          <div>
-            <p className="mb-2 text-sm text-foreground">Theme Color</p>
-            <div className="flex gap-2.5">
-              {themeColorPresets.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  aria-label={preset.label}
-                  onClick={() => {
-                    applyThemeColor(preset.id)
-                    setThemeColor(preset.id)
-                  }}
-                  className="relative flex size-8 items-center justify-center rounded-full ring-2 ring-offset-2 ring-offset-card transition-all"
-                  style={
-                    {
-                      backgroundColor: preset.swatch,
-                      '--tw-ring-color': themeColor === preset.id ? preset.swatch : 'transparent',
-                    } as CSSProperties
+            <div className="flex w-full items-center gap-2.5 py-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Palette className="size-4" />
+              </span>
+              <span className="flex-1 text-sm font-medium text-foreground">Theme Color</span>
+              <Select
+                value={themeColor}
+                onValueChange={(value) => {
+                  applyThemeColor(value)
+                  setThemeColor(value)
+                }}
+              >
+                <SelectTrigger size="sm" className="w-[130px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  {themeColorPresets.map((preset) => (
+                    <SelectItem key={preset.id} value={preset.id}>
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: preset.swatch } as CSSProperties}
+                      />
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex w-full items-center gap-2.5 py-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Bell className="size-4" />
+              </span>
+              <span className="flex-1 text-sm font-medium text-foreground">Notifications</span>
+              <Switch
+                checked={notificationsEnabled}
+                onCheckedChange={(checked) => {
+                  setNotificationsEnabled(checked)
+                  localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(checked))
+                }}
+              />
+            </div>
+
+            <div className="flex w-full items-center gap-2.5 py-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Globe className="size-4" />
+              </span>
+              <span className="flex-1 text-sm font-medium text-foreground">Language</span>
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger size="sm" className="w-[130px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  {languageOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value} disabled={option.comingSoon}>
+                      {option.label}
+                      {option.comingSoon ? ' (Coming soon)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex w-full items-center gap-2.5 py-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Lock className="size-4" />
+              </span>
+              <span className="flex-1 text-sm font-medium text-foreground">App Lock</span>
+              <Switch
+                checked={appLockEnabled}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSetPinOpen(true)
+                  } else {
+                    setDisableLockOpen(true)
                   }
+                }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/settings/whatsapp')}
+              className="flex w-full items-center gap-2.5 py-3 text-left"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted p-1.5">
+                <img src={whatsappLogo} alt="" className="size-full" />
+              </span>
+              <span className="flex-1 text-sm font-medium text-foreground">WhatsApp Integration</span>
+              <ChevronRight className="size-4 text-muted-foreground" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/settings/past-tenants')}
+              className="flex w-full items-center gap-2.5 py-3 text-left"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Users className="size-4" />
+              </span>
+              <span className="flex-1 text-sm font-medium text-foreground">Past Tenants</span>
+              <ChevronRight className="size-4 text-muted-foreground" />
+            </button>
+
+            {isDemoMode ? null : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setClearDataOpen(true)}
+                  className="flex w-full items-center gap-2.5 py-3 text-left"
                 >
-                  {themeColor === preset.id ? <Check className="size-4 text-white" /> : null}
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-warning/10 text-warning">
+                    <Trash2 className="size-4" />
+                  </span>
+                  <span className="flex-1 text-sm font-medium text-foreground">Clear App Data</span>
+                  <ChevronRight className="size-4 text-muted-foreground" />
                 </button>
-              ))}
-            </div>
+
+                <button
+                  type="button"
+                  onClick={() => setDeleteAccountOpen(true)}
+                  className="flex w-full items-center gap-2.5 py-3 text-left"
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger">
+                    <ShieldAlert className="size-4" />
+                  </span>
+                  <span className="flex-1 text-sm font-medium text-danger">Delete Account</span>
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </button>
+              </>
+            )}
           </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Bell className="size-4 text-muted-foreground" />
-              <span className="text-sm text-foreground">Notifications</span>
-            </div>
-            <Switch
-              checked={notificationsEnabled}
-              onCheckedChange={(checked) => {
-                setNotificationsEnabled(checked)
-                localStorage.setItem(NOTIFICATIONS_KEY, String(checked))
-              }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Globe className="size-4 text-muted-foreground" />
-              <span className="text-sm text-foreground">Language</span>
-            </div>
-            <span className="text-sm text-muted-foreground">English</span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Lock className="size-4 text-muted-foreground" />
-              <span className="text-sm text-foreground">App Lock</span>
-            </div>
-            <Switch
-              checked={appLockEnabled}
-              onCheckedChange={(checked) => {
-                setAppLockEnabled(checked)
-                localStorage.setItem(APP_LOCK_KEY, String(checked))
-              }}
-            />
-          </div>
-
-          <Separator />
-
-          <button
-            type="button"
-            onClick={() => navigate('/settings/whatsapp')}
-            className="flex w-full items-center gap-2.5 py-1.5 text-left"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
-              <MessageCircle className="size-4" />
-            </span>
-            <span className="flex-1 text-sm font-medium text-foreground">WhatsApp Integration</span>
-            <ChevronRight className="size-4 text-muted-foreground" />
-          </button>
-
-          <Separator />
-
-          <button
-            type="button"
-            onClick={() => navigate('/settings/past-tenants')}
-            className="flex w-full items-center gap-2.5 py-1.5 text-left"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <Users className="size-4" />
-            </span>
-            <span className="flex-1 text-sm font-medium text-foreground">Past Tenants</span>
-            <ChevronRight className="size-4 text-muted-foreground" />
-          </button>
-
-          <Separator />
-
-          <button
-            type="button"
-            onClick={() => setClearDataOpen(true)}
-            className="flex w-full items-center gap-2.5 py-1.5 text-left"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-warning/10 text-warning">
-              <Trash2 className="size-4" />
-            </span>
-            <span className="flex-1 text-sm font-medium text-foreground">Clear App Data</span>
-            <ChevronRight className="size-4 text-muted-foreground" />
-          </button>
-
-          <Separator />
-
-          <button
-            type="button"
-            onClick={() => setDeleteAccountOpen(true)}
-            className="flex w-full items-center gap-2.5 py-1.5 text-left"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger">
-              <ShieldAlert className="size-4" />
-            </span>
-            <span className="flex-1 text-sm font-medium text-danger">Delete Account</span>
-            <ChevronRight className="size-4 text-muted-foreground" />
-          </button>
         </CardContent>
       </Card>
 
@@ -305,9 +316,13 @@ export function SettingsPage() {
       <div className="flex items-center justify-center gap-1.5 pb-4 text-center text-xs text-muted-foreground">
         <span>StayGrid v{APP_VERSION}</span>
         <span className="text-muted-foreground/40">·</span>
-        <a href="#" className="underline underline-offset-2">
+        <button
+          type="button"
+          onClick={() => navigate('/settings/privacy-policy')}
+          className="underline underline-offset-2"
+        >
           Privacy Policy
-        </a>
+        </button>
         <span className="text-muted-foreground/40">·</span>
         <span>Made by Ravi</span>
       </div>
@@ -316,11 +331,7 @@ export function SettingsPage() {
         open={clearDataOpen}
         onOpenChange={setClearDataOpen}
         title="Clear all app data?"
-        description={
-          isDemoMode
-            ? 'This removes everything saved on this device and returns you to the login screen.'
-            : "This permanently deletes your building, tenants, payments, and every other record, then takes you back to setup. This can't be undone."
-        }
+        description="This permanently deletes your tenants, floors, rooms, payments, expenses, and every other record. Your building profile stays as-is, so you won't have to set up again. This can't be undone."
         confirmLabel="Clear Data"
         isPending={clearDataMutation.isPending}
         onConfirm={() => {
@@ -339,6 +350,21 @@ export function SettingsPage() {
         onConfirm={() => {
           deleteAccountMutation.mutate()
           setDeleteAccountOpen(false)
+        }}
+      />
+
+      <SetPinSheet open={setPinOpen} onOpenChange={setSetPinOpen} />
+
+      <ConfirmSheet
+        open={disableLockOpen}
+        onOpenChange={setDisableLockOpen}
+        title="Turn off App Lock?"
+        description="You won't need a PIN to open StayGrid anymore."
+        confirmLabel="Turn Off"
+        destructive={false}
+        onConfirm={() => {
+          disableAppLock()
+          setDisableLockOpen(false)
         }}
       />
     </div>

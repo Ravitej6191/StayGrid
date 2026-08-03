@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
-import { BedDouble, ChevronLeft, Pencil, Phone, Trash2, UserPlus, UserRound, Wrench } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { ChevronLeft, Pencil, Phone, Trash2, UserMinus, UserPlus, UserRound, Wrench } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { EmptyState } from '@/components/common/empty-state'
 import { StatusChip } from '@/components/common/status-chip'
+import { ConfirmSheet } from '@/components/common/confirm-sheet'
+import { unassignTenant } from '@/features/tenants/services/tenants.service'
 import { rentStatusTokens } from '@/constants/status'
-import { formatCurrency, formatDateTime } from '@/utils/format'
+import { formatCurrency, formatDate } from '@/utils/format'
 import { BedTile } from './bed-tile'
 import { roomTypeLabel } from '../types'
 import type { Bed, Room } from '../types'
@@ -54,19 +58,22 @@ export function RoomDetailSheet({
               <button
                 type="button"
                 onClick={() => setActiveBed(null)}
-                className="flex size-7 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
+                className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
               >
                 <ChevronLeft className="size-4" />
               </button>
             ) : null}
-            {activeBed ? `Bed ${activeBed.bedLabel} · Room ${room.roomNumber}` : `Room ${room.roomNumber}`}
+            <span className="truncate">
+              {activeBed ? `Bed ${activeBed.bedLabel} · Room ${room.roomNumber}` : `Room ${room.roomNumber}`}
+            </span>
           </SheetTitle>
+          {activeBed ? <p className="text-xs text-muted-foreground">{floorName}</p> : null}
         </SheetHeader>
 
         <div className="space-y-5 px-4 pb-8">
           {activeBed ? (
             <motion.div key="bed" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.16 }}>
-              <BedDetail bed={activeBed} room={room} floorName={floorName} onAssignTenant={onAssignTenant} onViewTenant={onViewTenant} />
+              <BedDetail bed={activeBed} room={room} onAssignTenant={onAssignTenant} onViewTenant={onViewTenant} />
             </motion.div>
           ) : (
             <motion.div key="room" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.16 }} className="space-y-5">
@@ -122,12 +129,28 @@ function RoomFacts({ room, floorName }: { room: Room; floorName: string }) {
 interface BedDetailProps {
   bed: Bed
   room: Room
-  floorName: string
   onAssignTenant: (room: Room, bed: Bed) => void
   onViewTenant: (tenantId: string) => void
 }
 
-function BedDetail({ bed, room, floorName, onAssignTenant, onViewTenant }: BedDetailProps) {
+function BedDetail({ bed, room, onAssignTenant, onViewTenant }: BedDetailProps) {
+  const queryClient = useQueryClient()
+  const [removeOpen, setRemoveOpen] = useState(false)
+
+  const removeMutation = useMutation({
+    mutationFn: unassignTenant,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['building'] }),
+        queryClient.invalidateQueries({ queryKey: ['tenants'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ])
+      toast.success('Tenant removed from the room')
+      setRemoveOpen(false)
+    },
+    onError: () => toast.error('Could not remove the tenant. Please try again.'),
+  })
+
   if (bed.status === 'maintenance') {
     return <EmptyState icon={Wrench} title="Under maintenance" description="This bed is temporarily unavailable." />
   }
@@ -152,23 +175,17 @@ function BedDetail({ bed, room, floorName, onAssignTenant, onViewTenant }: BedDe
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <BedDouble className="size-3.5" />
-        {floorName} · Room {room.roomNumber} · Bed {bed.bedLabel}
-      </div>
-
       <div className="flex items-center gap-3">
         <Avatar className="size-12">
           {tenant.photoUrl ? <AvatarImage src={tenant.photoUrl} alt={tenant.name} /> : null}
           <AvatarFallback>{initials(tenant.name)}</AvatarFallback>
         </Avatar>
-        <div>
-          <p className="text-sm font-semibold text-foreground">{tenant.name}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-foreground">{tenant.name}</p>
           <p className="text-xs text-muted-foreground">{tenant.phone}</p>
         </div>
+        <StatusChip token={rentToken} />
       </div>
-
-      <StatusChip token={rentToken} />
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-lg bg-muted p-3">
@@ -177,22 +194,34 @@ function BedDetail({ bed, room, floorName, onAssignTenant, onViewTenant }: BedDe
         </div>
         <div className="rounded-lg bg-muted p-3">
           <p className="text-xs text-muted-foreground">Joined</p>
-          <p className="font-medium text-foreground">{formatDateTime(tenant.joiningDate)}</p>
+          <p className="font-medium text-foreground">{formatDate(tenant.joiningDate)}</p>
         </div>
       </div>
 
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" className="flex-1" asChild>
+        <Button variant="outline" size="icon" asChild aria-label="Call tenant">
           <a href={`tel:${tenant.phone}`}>
             <Phone className="size-4" />
-            Call
           </a>
         </Button>
-        <Button variant="outline" size="sm" className="flex-1" onClick={() => onViewTenant(tenant.id)}>
+        <Button variant="outline" size="icon" onClick={() => setRemoveOpen(true)} aria-label="Remove from room" className="text-danger hover:text-danger">
+          <UserMinus className="size-4" />
+        </Button>
+        <Button variant="outline" className="flex-1" onClick={() => onViewTenant(tenant.id)}>
           <UserRound className="size-4" />
           Profile
         </Button>
       </div>
+
+      <ConfirmSheet
+        open={removeOpen}
+        onOpenChange={setRemoveOpen}
+        title="Remove from this room?"
+        description={`${tenant.name} stays on as a tenant but won't be assigned to a bed. You can allot them to a room again anytime.`}
+        confirmLabel="Remove"
+        isPending={removeMutation.isPending}
+        onConfirm={() => removeMutation.mutate(tenant.id)}
+      />
     </div>
   )
 }

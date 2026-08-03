@@ -14,7 +14,13 @@ const TenantsPage = lazy(() => import('@/pages/tenants-page').then((m) => ({ def
 const TenantDetailPage = lazy(() =>
   import('@/pages/tenant-detail-page').then((m) => ({ default: m.TenantDetailPage })),
 )
+const AddTenantPage = lazy(() => import('@/pages/add-tenant-page').then((m) => ({ default: m.AddTenantPage })))
+const RecordPaymentPage = lazy(() =>
+  import('@/pages/record-payment-page').then((m) => ({ default: m.RecordPaymentPage })),
+)
 const ExpensesPage = lazy(() => import('@/pages/expenses-page').then((m) => ({ default: m.ExpensesPage })))
+const AddExpensePage = lazy(() => import('@/pages/add-expense-page').then((m) => ({ default: m.AddExpensePage })))
+const BroadcastPage = lazy(() => import('@/pages/broadcast-page').then((m) => ({ default: m.BroadcastPage })))
 const SettingsPage = lazy(() => import('@/pages/settings-page').then((m) => ({ default: m.SettingsPage })))
 const PastTenantsPage = lazy(() =>
   import('@/pages/past-tenants-page').then((m) => ({ default: m.PastTenantsPage })),
@@ -28,6 +34,10 @@ const NotificationsPage = lazy(() =>
 const WhatsAppIntegrationPage = lazy(() =>
   import('@/pages/whatsapp-integration-page').then((m) => ({ default: m.WhatsAppIntegrationPage })),
 )
+const PrivacyPolicyPage = lazy(() =>
+  import('@/pages/privacy-policy-page').then((m) => ({ default: m.PrivacyPolicyPage })),
+)
+const NotFoundPage = lazy(() => import('@/pages/not-found-page').then((m) => ({ default: m.NotFoundPage })))
 
 function PageFallback() {
   return (
@@ -60,12 +70,19 @@ export const router = createBrowserRouter([
               { path: '/dashboard', element: withSuspense(<DashboardPage />) },
               { path: '/building', element: withSuspense(<BuildingPage />) },
               { path: '/tenants', element: withSuspense(<TenantsPage />) },
+              { path: '/tenants/new', element: withSuspense(<AddTenantPage />) },
+              { path: '/tenants/record-payment', element: withSuspense(<RecordPaymentPage />) },
               { path: '/tenants/:id', element: withSuspense(<TenantDetailPage />) },
+              { path: '/tenants/:id/edit', element: withSuspense(<AddTenantPage />) },
               { path: '/expenses', element: withSuspense(<ExpensesPage />) },
+              { path: '/expenses/new', element: withSuspense(<AddExpensePage />) },
+              { path: '/expenses/:id/edit', element: withSuspense(<AddExpensePage />) },
+              { path: '/broadcast', element: withSuspense(<BroadcastPage />) },
               { path: '/settings', element: withSuspense(<SettingsPage />) },
               { path: '/settings/past-tenants', element: withSuspense(<PastTenantsPage />) },
               { path: '/settings/edit-profile', element: withSuspense(<EditProfilePage />) },
               { path: '/settings/whatsapp', element: withSuspense(<WhatsAppIntegrationPage />) },
+              { path: '/settings/privacy-policy', element: withSuspense(<PrivacyPolicyPage />) },
               { path: '/notifications', element: withSuspense(<NotificationsPage />) },
             ],
           },
@@ -73,5 +90,5 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  { path: '*', element: <Navigate to="/dashboard" replace /> },
+  { path: '*', element: withSuspense(<NotFoundPage />) },
 ])

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Banknote, BedDouble, DoorOpen, IndianRupee, ShieldAlert } from 'lucide-react'
 import { ChartCard } from '@/components/common/chart-card'
 import { ErrorState } from '@/components/common/error-state'
@@ -9,10 +9,6 @@ import { useBuildingData } from '@/features/building/hooks/use-building-data'
 import { StatCard } from '@/features/dashboard/components/stat-card'
 import { QuickActions } from '@/features/dashboard/components/quick-actions'
 import { IncomeExpenseChart } from '@/features/dashboard/components/income-expense-chart'
-import { AddTenantSheet } from '@/features/tenants/components/add-tenant-sheet'
-import { RecordPaymentSheet } from '@/features/tenants/components/record-payment-sheet'
-import { AddExpenseSheet } from '@/features/expenses/components/add-expense-sheet'
-import { BroadcastSheet } from '@/features/broadcast/components/broadcast-sheet'
 import { formatCurrency } from '@/utils/format'
 import { getTimeOfDayGreeting } from '@/utils/greeting'
 import { usePageTitle } from '@/hooks/use-page-title'
@@ -20,13 +16,10 @@ import { useAuth } from '@/providers/auth-provider'
 
 export function DashboardPage() {
   usePageTitle('StayGrid')
+  const navigate = useNavigate()
   const { data, isLoading, isError, refetch } = useDashboardData()
   const { data: building } = useBuildingData()
   const { user } = useAuth()
-  const [addTenantOpen, setAddTenantOpen] = useState(false)
-  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false)
-  const [addExpenseOpen, setAddExpenseOpen] = useState(false)
-  const [broadcastOpen, setBroadcastOpen] = useState(false)
 
   const greeting = getTimeOfDayGreeting()
 
@@ -42,10 +35,10 @@ export function DashboardPage() {
         </div>
 
         <QuickActions
-          onRecordPayment={() => setRecordPaymentOpen(true)}
-          onAddTenant={() => setAddTenantOpen(true)}
-          onAddExpense={() => setAddExpenseOpen(true)}
-          onBroadcast={() => setBroadcastOpen(true)}
+          onRecordPayment={() => navigate('/tenants/record-payment')}
+          onAddTenant={() => navigate('/tenants/new')}
+          onAddExpense={() => navigate('/expenses/new')}
+          onBroadcast={() => navigate('/broadcast')}
         />
 
         {isError ? (
@@ -74,11 +67,6 @@ export function DashboardPage() {
             </ChartCard>
           </>
         )}
-
-        <AddTenantSheet open={addTenantOpen} onOpenChange={setAddTenantOpen} />
-        <RecordPaymentSheet open={recordPaymentOpen} onOpenChange={setRecordPaymentOpen} />
-        <AddExpenseSheet open={addExpenseOpen} onOpenChange={setAddExpenseOpen} />
-        <BroadcastSheet open={broadcastOpen} onOpenChange={setBroadcastOpen} />
       </div>
     </PullToRefresh>
   )

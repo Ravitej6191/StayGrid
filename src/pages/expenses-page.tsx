@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,17 +12,21 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmSheet } from '@/components/common/confirm-sheet'
 import { useExpenses } from '@/features/expenses/hooks/use-expenses'
 import { ExpenseListItem } from '@/features/expenses/components/expense-list-item'
-import { AddExpenseSheet } from '@/features/expenses/components/add-expense-sheet'
 import { deleteExpense } from '@/features/expenses/services/expenses.service'
 import { expenseCategoryOptions, type Expense } from '@/features/expenses/types'
+import { formatCurrency } from '@/utils/format'
 import { usePageTitle } from '@/hooks/use-page-title'
 
+function monthLabel(key: string): string {
+  const [year, month] = key.split('-').map(Number)
+  return new Date(year!, (month ?? 1) - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+}
+
 export function ExpensesPage() {
-  usePageTitle('Expenses')
+  const navigate = useNavigate()
+  usePageTitle('Expenses', () => navigate(-1))
   const queryClient = useQueryClient()
   const { data: expenses, isLoading, isError, refetch } = useExpenses()
-  const [addOpen, setAddOpen] = useState(false)
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null)
   const [search, setSearch] = useState('')
 
@@ -33,6 +38,23 @@ export function ExpensesPage() {
       return label.toLowerCase().includes(query) || (e.description ?? '').toLowerCase().includes(query)
     })
   }, [expenses, search])
+
+  const groupedExpenses = useMemo(() => {
+    const groups = new Map<string, Expense[]>()
+    for (const expense of filteredExpenses) {
+      const key = expense.expenseDate.slice(0, 7)
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(expense)
+    }
+    return Array.from(groups.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, items]) => ({
+        key,
+        label: monthLabel(key),
+        total: items.reduce((sum, e) => sum + e.amount, 0),
+        items,
+      }))
+  }, [filteredExpenses])
 
   const deleteMutation = useMutation({
     mutationFn: deleteExpense,
@@ -76,24 +98,25 @@ export function ExpensesPage() {
           ) : filteredExpenses.length === 0 ? (
             <EmptyState icon={Search} title="No matches" description="Try a different search." />
           ) : (
-            <div className="space-y-2">
-              {filteredExpenses.map((expense) => (
-                <ExpenseListItem
-                  key={expense.id}
-                  expense={expense}
-                  onEdit={() => setEditingExpense(expense)}
-                  onDelete={() => setDeletingExpense(expense)}
-                />
+            <div className="space-y-4">
+              {groupedExpenses.map((group) => (
+                <div key={group.key} className="space-y-2">
+                  <div className="flex items-center justify-between px-0.5">
+                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
+                    <p className="text-xs font-medium text-muted-foreground">{formatCurrency(group.total)}</p>
+                  </div>
+                  {group.items.map((expense) => (
+                    <ExpenseListItem
+                      key={expense.id}
+                      expense={expense}
+                      onEdit={() => navigate(`/expenses/${expense.id}/edit`)}
+                      onDelete={() => setDeletingExpense(expense)}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
           )}
-
-          <AddExpenseSheet open={addOpen} onOpenChange={setAddOpen} />
-          <AddExpenseSheet
-            open={editingExpense !== null}
-            onOpenChange={(open) => !open && setEditingExpense(null)}
-            existingExpense={editingExpense}
-          />
 
           <ConfirmSheet
             open={deletingExpense !== null}
@@ -109,7 +132,7 @@ export function ExpensesPage() {
         </div>
       </PullToRefresh>
 
-      <Fab onClick={() => setAddOpen(true)}>
+      <Fab onClick={() => navigate('/expenses/new')}>
         <Plus className="size-6" />
       </Fab>
     </>
