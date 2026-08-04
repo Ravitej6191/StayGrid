@@ -33,8 +33,6 @@ export type ExpenseCategory =
   | 'furniture'
   | 'salary'
   | 'misc'
-export type MaintenancePriority = 'low' | 'medium' | 'high' | 'urgent'
-export type MaintenanceStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
 export type InventoryCategory =
   | 'kitchen'
   | 'furniture'
@@ -150,23 +148,6 @@ export type ExpenseRow = {
   created_at: string
 }
 
-export type MaintenanceRow = {
-  id: string
-  room_id: string
-  title: string
-  description: string | null
-  priority: MaintenancePriority
-  status: MaintenanceStatus
-  vendor_name: string | null
-  cost: number | null
-  invoice_url: string | null
-  photos: string[]
-  completion_date: string | null
-  notes: string | null
-  created_at: string
-  updated_at: string
-}
-
 export type InventoryRow = {
   id: string
   building_id: string
@@ -250,7 +231,6 @@ export type Database = {
       tenants: TableDef<TenantRow>
       payments: TableDef<PaymentRow>
       expenses: TableDef<ExpenseRow>
-      maintenance: TableDef<MaintenanceRow>
       inventory: TableDef<InventoryRow>
       documents: TableDef<DocumentRow>
       activities: TableDef<ActivityRow>

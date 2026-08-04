@@ -249,7 +249,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={() => navigate('/settings/whatsapp')}
-              className="flex w-full items-center gap-2.5 py-3 text-left"
+              className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-3 -mx-1.5 text-left transition-colors hover:bg-accent/60"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted p-1.5">
                 <img src={whatsappLogo} alt="" className="size-full" />

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronLeft, Pencil, Phone, Trash2, UserMinus, UserPlus, UserRound, Wrench } from 'lucide-react'
+import { ChevronLeft, Pencil, Phone, Trash2, UserMinus, UserPlus, UserRound } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -150,10 +150,6 @@ function BedDetail({ bed, room, onAssignTenant, onViewTenant }: BedDetailProps) 
     },
     onError: () => toast.error('Could not remove the tenant. Please try again.'),
   })
-
-  if (bed.status === 'maintenance') {
-    return <EmptyState icon={Wrench} title="Under maintenance" description="This bed is temporarily unavailable." />
-  }
 
   if (!bed.tenant) {
     return (

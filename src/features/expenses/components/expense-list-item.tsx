@@ -56,9 +56,9 @@ export function ExpenseListItem({ expense, onEdit, onDelete }: ExpenseListItemPr
   const Icon = iconByCategory[expense.category]
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+    <div className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-all duration-200 ease-[var(--ease-out-smooth)] hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${colorByCategory[expense.category]}`}>
+        <span className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover:scale-110 ${colorByCategory[expense.category]}`}>
           <Icon className="size-4" />
         </span>
         <div className="min-w-0 flex-1">

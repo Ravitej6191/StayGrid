@@ -1,8 +1,5 @@
 import type {
-  BedStatus,
   ExpenseCategory,
-  MaintenancePriority,
-  MaintenanceStatus,
   PaymentMode,
   PropertyType,
   RentStatus,
@@ -10,7 +7,7 @@ import type {
   TenantStatus,
 } from '@/types/database.types'
 import type { Tenant } from '@/types/domain'
-import { formatCurrency, monthKey as localMonthKey } from '@/utils/format'
+import { formatCurrency, monthKey as localMonthKey, todayIso } from '@/utils/format'
 import { areNotificationsEnabled } from './notification-prefs'
 
 /**
@@ -68,7 +65,7 @@ export interface DemoBed {
   id: string
   roomId: string
   bedLabel: string
-  status: BedStatus
+  status: 'vacant' | 'occupied'
 }
 
 export interface DemoTenant {
@@ -133,16 +130,6 @@ export interface DemoExpense {
   createdAt: string
 }
 
-export interface DemoMaintenance {
-  id: string
-  roomId: string
-  title: string
-  description: string | null
-  priority: MaintenancePriority
-  status: MaintenanceStatus
-  createdAt: string
-}
-
 export interface DemoBroadcast {
   id: string
   message: string
@@ -159,7 +146,7 @@ export interface DemoSettings {
   lastRentResetMonth: string | null
 }
 
-export type NotificationType = 'tenant' | 'payment' | 'maintenance' | 'expense' | 'broadcast'
+export type NotificationType = 'tenant' | 'payment' | 'expense' | 'broadcast'
 
 export interface DemoNotification {
   id: string
@@ -179,7 +166,6 @@ export interface DemoDb {
   tenants: DemoTenant[]
   payments: DemoPayment[]
   expenses: DemoExpense[]
-  maintenance: DemoMaintenance[]
   broadcasts: DemoBroadcast[]
   notifications: DemoNotification[]
 }
@@ -206,7 +192,6 @@ function emptyDb(): DemoDb {
     tenants: [],
     payments: [],
     expenses: [],
-    maintenance: [],
     broadcasts: [],
     notifications: [],
   }
@@ -289,7 +274,6 @@ export function seedFromOnboarding(input: OnboardingSeedInput): DemoDb {
     tenants: [],
     payments: [],
     expenses: [],
-    maintenance: [],
     broadcasts: [],
     notifications: [],
   }))
@@ -355,7 +339,7 @@ export function addRoom(input: AddRoomInput): { room: DemoRoom; beds: DemoBed[] 
     id: crypto.randomUUID(),
     roomId: room.id,
     bedLabel: String.fromCharCode(65 + i),
-    status: 'vacant' as BedStatus,
+    status: 'vacant',
   }))
 
   updateDemoDb((db) => ({ ...db, rooms: [...db.rooms, room], beds: [...db.beds, ...beds] }))
@@ -389,7 +373,7 @@ export function updateRoom(input: UpdateRoomInput): void {
       id: crypto.randomUUID(),
       roomId: input.id,
       bedLabel: String.fromCharCode(65 + nextLabelStart + i),
-      status: 'vacant' as BedStatus,
+      status: 'vacant',
     }))
     beds = [...db.beds, ...newBeds]
   } else if (input.capacity < existingBeds.length) {
@@ -532,7 +516,7 @@ export function addTenant(input: AddTenantInput): DemoTenant {
     company: input.company,
     bloodGroup: input.bloodGroup,
     photoUrl: input.photoUrl,
-    joiningDate: new Date().toISOString().slice(0, 10),
+    joiningDate: todayIso(),
     vacatingDate: null,
     advance: 0,
     deposit: input.deposit,
@@ -649,7 +633,7 @@ export function vacateTenant(tenantId: string): void {
       ...db,
       tenants: db.tenants.map((t) =>
         t.id === tenantId
-          ? { ...t, status: 'vacated', vacatingDate: new Date().toISOString().slice(0, 10), bedId: null }
+          ? { ...t, status: 'vacated', vacatingDate: todayIso(), bedId: null }
           : t,
       ),
       beds: db.beds.map((b) => (b.id === bedId ? { ...b, status: 'vacant' } : b)),

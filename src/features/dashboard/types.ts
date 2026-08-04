@@ -8,10 +8,12 @@ export interface DashboardStats {
 }
 
 export interface IncomeExpenseTrendPoint {
-  month: string
+  label: string
   income: number
   expenses: number
 }
+
+export type DashboardRange = 'week' | 'fortnight' | 'month' | 'all'
 
 export interface DashboardData {
   stats: DashboardStats

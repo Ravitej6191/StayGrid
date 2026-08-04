@@ -18,7 +18,7 @@ export function AppHeader() {
   const { user } = useAuth()
 
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-1.5 border-b border-border bg-card px-4 pt-[env(safe-area-inset-top)]">
+    <header className="sticky top-0 z-30 flex items-center gap-1.5 border-b border-border/80 bg-card/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
       {onBack ? (
         <button
           type="button"

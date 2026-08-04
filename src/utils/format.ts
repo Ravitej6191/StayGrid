@@ -32,6 +32,20 @@ export function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
+/** Local (not UTC) YYYY-MM-DD for a date — `date.toISOString()` converts to
+ * UTC first, which rolls back to the previous calendar day for part of the
+ * day in any positive-UTC-offset timezone (e.g. IST, for local times before
+ * 5:30am). Use this instead of `toISOString().slice(0, 10)` for "today"/
+ * date-only defaults. */
+export function dateOnlyIso(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/** Today's date as a local YYYY-MM-DD string. */
+export function todayIso(): string {
+  return dateOnlyIso(new Date())
+}
+
 /** Same YYYY-MM bucketing as `monthKey`, but for an ISO date *string*
  * (e.g. a payment/expense date already in `YYYY-MM-DD` form) — avoids a
  * redundant Date parse/reformat round trip. */

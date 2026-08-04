@@ -98,7 +98,7 @@ export function BuildingPage() {
               <button
                 type="button"
                 onClick={() => setAddFloorOpen(true)}
-                className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-card py-2.5 text-primary transition-colors hover:bg-accent"
+                className="press-scale flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-primary/30 bg-card py-2.5 text-primary transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/5 hover:shadow-sm"
               >
                 <Plus className="size-4" />
                 <span className="text-[11px] font-medium">Add Floor</span>
@@ -110,7 +110,7 @@ export function BuildingPage() {
                 <AccordionItem
                   key={floor.id}
                   value={floor.id}
-                  className="rounded-xl border border-border bg-card px-3 last:border-b"
+                  className="rounded-xl border border-border bg-card px-3 shadow-sm transition-shadow duration-300 last:border-b hover:shadow-md"
                 >
                   <div className="flex items-center gap-1 py-1.5">
                     <span className="flex flex-1 items-baseline gap-2 py-1.5">
@@ -250,7 +250,7 @@ function KpiTile({
   tone: string
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-border bg-card py-2.5">
+    <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-border bg-card py-2.5 shadow-sm transition-shadow duration-300 hover:shadow-md">
       <span className="flex items-center gap-1.5">
         <Icon className={`size-3.5 ${tone}`} />
         <span className="font-numeric text-sm font-semibold text-foreground">{value}</span>

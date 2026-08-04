@@ -5,9 +5,8 @@
  */
 
 export type OccupancyStatus = 'vacant' | 'partial' | 'occupied'
-export type BedCardStatus = 'vacant' | 'occupied' | 'maintenance'
+export type BedCardStatus = 'vacant' | 'occupied'
 export type RentBadgeStatus = 'paid' | 'partial' | 'pending' | 'advance'
-export type MaintenanceBadgeStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
 
 interface StatusToken {
   label: string
@@ -40,12 +39,6 @@ export const occupancyStatusTokens: Record<OccupancyStatus, StatusToken> = {
 export const bedStatusTokens: Record<BedCardStatus, StatusToken> = {
   occupied: occupancyStatusTokens.occupied,
   vacant: occupancyStatusTokens.vacant,
-  maintenance: {
-    label: 'Maintenance',
-    dot: 'bg-info',
-    badge: 'bg-info/15 text-info border-info/30',
-    border: 'border-l-info',
-  },
 }
 
 export const rentStatusTokens: Record<RentBadgeStatus, StatusToken> = {
@@ -72,32 +65,5 @@ export const rentStatusTokens: Record<RentBadgeStatus, StatusToken> = {
     dot: 'bg-info',
     badge: 'bg-info/15 text-info border-info/30',
     border: 'border-l-info',
-  },
-}
-
-export const maintenanceStatusTokens: Record<MaintenanceBadgeStatus, StatusToken> = {
-  open: {
-    label: 'Open',
-    dot: 'bg-danger',
-    badge: 'bg-danger/15 text-danger border-danger/30',
-    border: 'border-l-danger',
-  },
-  in_progress: {
-    label: 'In Progress',
-    dot: 'bg-info',
-    badge: 'bg-info/15 text-info border-info/30',
-    border: 'border-l-info',
-  },
-  completed: {
-    label: 'Completed',
-    dot: 'bg-success',
-    badge: 'bg-success/15 text-success border-success/30',
-    border: 'border-l-success',
-  },
-  cancelled: {
-    label: 'Cancelled',
-    dot: 'bg-neutral',
-    badge: 'bg-neutral/15 text-neutral-foreground border-neutral/30',
-    border: 'border-l-neutral',
   },
 }

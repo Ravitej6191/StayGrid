@@ -38,7 +38,7 @@ export function IncomeExpenseChart({ data }: { data: IncomeExpenseTrendPoint[] }
     xAxis: {
       type: 'category',
       boundaryGap: true,
-      data: data.map((d) => d.month),
+      data: data.map((d) => d.label),
       axisLine: { lineStyle: { color: colors.border } },
       axisLabel: { color: colors['muted-foreground'], fontSize: 11, fontWeight: 500 },
       axisTick: { show: false },

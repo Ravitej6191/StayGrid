@@ -160,7 +160,9 @@ export function TenantDetailPage() {
             </div>
             {tenant.aadhaarNumber ? (
               <div className="flex items-center gap-2">
-                <IdCard className="size-3.5 shrink-0" /> {formatAadhaar(tenant.aadhaarNumber)}
+                <IdCard className="size-3.5 shrink-0" />
+                <span className="text-xs text-muted-foreground/70">Aadhaar</span>
+                <span className="text-foreground">{formatAadhaar(tenant.aadhaarNumber)}</span>
               </div>
             ) : null}
             {tenant.occupation ? (
@@ -173,8 +175,11 @@ export function TenantDetailPage() {
             {tenant.emergencyContactName ? (
               <div className="flex items-center gap-2">
                 <UserX className="size-3.5 shrink-0" />
-                {tenant.emergencyContactName}
-                {tenant.emergencyContactPhone ? ` · ${tenant.emergencyContactPhone}` : ''}
+                <span className="text-xs text-muted-foreground/70">Emergency</span>
+                <span className="text-foreground">
+                  {tenant.emergencyContactName}
+                  {tenant.emergencyContactPhone ? ` · ${tenant.emergencyContactPhone}` : ''}
+                </span>
               </div>
             ) : null}
             {tenant.bloodGroup ? (

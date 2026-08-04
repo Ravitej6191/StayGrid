@@ -17,6 +17,7 @@ import { expenseCategoryOptions } from '@/features/expenses/types'
 import { useExpenses } from '@/features/expenses/hooks/use-expenses'
 import { createExpense, updateExpense } from '@/features/expenses/services/expenses.service'
 import { uploadTenantFile } from '@/lib/storage'
+import { todayIso } from '@/utils/format'
 import { usePageTitle } from '@/hooks/use-page-title'
 
 const expenseSchema = z
@@ -98,7 +99,7 @@ export function AddExpensePage() {
     defaultValues: {
       category: 'groceries',
       amount: 0,
-      expenseDate: new Date().toISOString().slice(0, 10),
+      expenseDate: todayIso(),
       description: '',
     },
   })
@@ -117,7 +118,7 @@ export function AddExpensePage() {
       })
       setImagePreview(existingExpense.imageUrl)
     } else {
-      reset({ category: 'groceries', amount: 0, expenseDate: new Date().toISOString().slice(0, 10), description: '' })
+      reset({ category: 'groceries', amount: 0, expenseDate: todayIso(), description: '' })
       setImagePreview(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,7 +204,14 @@ export function AddExpensePage() {
           name="category"
           control={control}
           render={({ field }) => (
-            <Select value={field.value} onValueChange={field.onChange}>
+            // key={field.value} forces Radix's Select to remount instead of
+            // receiving the new value as a prop change — when the value is
+            // set programmatically (react-hook-form's reset() when editing)
+            // rather than by the user opening the dropdown, Radix doesn't
+            // recognize it and silently fires onValueChange('') to "correct"
+            // itself, wiping the value we just set. Remounting sidesteps
+            // that self-correction entirely.
+            <Select key={field.value} value={field.value} onValueChange={field.onChange}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>

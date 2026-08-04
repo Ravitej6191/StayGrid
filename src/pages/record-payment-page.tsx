@@ -16,7 +16,7 @@ import { TenantCombobox } from '@/features/tenants/components/tenant-combobox'
 import { useTenants } from '@/features/tenants/hooks/use-tenants'
 import { createPayment, recordDeposit } from '@/features/tenants/services/tenants.service'
 import { uploadTenantFile } from '@/lib/storage'
-import { formatCurrency, monthKey, monthKeyOfDateString } from '@/utils/format'
+import { formatCurrency, monthKey, monthKeyOfDateString, todayIso } from '@/utils/format'
 import { cn } from '@/lib/utils'
 import { usePageTitle } from '@/hooks/use-page-title'
 
@@ -26,10 +26,6 @@ const paymentModes = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'cheque', label: 'Cheque' },
 ] as const
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
-}
 
 const recordSchema = z.object({
   tenantId: z.string().min(1, 'Choose a tenant'),

@@ -17,9 +17,9 @@ export function TenantListItem({ tenant }: { tenant: Tenant }) {
     <button
       type="button"
       onClick={() => navigate(`/tenants/${tenant.id}`)}
-      className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+      className="press-scale group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-all duration-200 ease-[var(--ease-out-smooth)] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
     >
-      <Avatar className="size-11">
+      <Avatar className="size-11 ring-2 ring-transparent transition-all duration-200 group-hover:ring-primary/20">
         {tenant.photoUrl ? <AvatarImage src={tenant.photoUrl} alt={tenant.name} /> : null}
         <AvatarFallback>{initials(tenant.name)}</AvatarFallback>
       </Avatar>

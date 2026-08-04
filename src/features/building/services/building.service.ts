@@ -23,26 +23,21 @@ export interface BuildingData {
   floors: Floor[]
 }
 
-function deriveRoomFlags(
-  beds: Bed[],
-  hasOpenMaintenance: boolean,
-): {
+function deriveRoomFlags(beds: Bed[]): {
   occupiedCount: number
   vacantCount: number
   occupancyStatus: OccupancyStatus
   hasRentPending: boolean
-  hasMaintenance: boolean
 } {
   const occupiedCount = beds.filter((b) => b.status === 'occupied').length
   const vacantCount = beds.filter((b) => b.status === 'vacant').length
-  const hasMaintenance = hasOpenMaintenance || beds.some((b) => b.status === 'maintenance')
   const hasRentPending = beds.some((b) => b.tenant?.rentStatus === 'pending')
 
   let occupancyStatus: OccupancyStatus = 'vacant'
   if (occupiedCount > 0 && occupiedCount === beds.length) occupancyStatus = 'occupied'
   else if (occupiedCount > 0) occupancyStatus = 'partial'
 
-  return { occupiedCount, vacantCount, occupancyStatus, hasRentPending, hasMaintenance }
+  return { occupiedCount, vacantCount, occupancyStatus, hasRentPending }
 }
 
 function getDemoData(): BuildingData {
@@ -67,9 +62,6 @@ function getDemoData(): BuildingData {
                 tenant: demoTenant ? resolveTenant(db, demoTenant) : null,
               }
             })
-          const hasOpenMaintenance = db.maintenance.some(
-            (m) => m.roomId === room.id && (m.status === 'open' || m.status === 'in_progress'),
-          )
           return {
             id: room.id,
             floorId: room.floorId,
@@ -77,7 +69,7 @@ function getDemoData(): BuildingData {
             roomType: room.roomType,
             capacity: room.capacity,
             beds,
-            ...deriveRoomFlags(beds, hasOpenMaintenance),
+            ...deriveRoomFlags(beds),
           }
         })
       return { id: floor.id, buildingId: floor.buildingId, floorNumber: floor.floorNumber, name: floor.name, rooms }
@@ -196,14 +188,6 @@ async function fetchFromSupabase(): Promise<BuildingData> {
     .eq('status', 'active')
   if (tenantsError) throw tenantsError
 
-  const { data: maintenanceRows, error: maintenanceError } = await supabase
-    .from('maintenance')
-    .select('room_id, status')
-    .in('room_id', roomIds)
-    .in('status', ['open', 'in_progress'])
-  if (maintenanceError) throw maintenanceError
-  const roomsWithOpenMaintenance = new Set(maintenanceRows.map((m) => m.room_id))
-
   const roomNumberById = new Map(roomRows.map((r) => [r.id, r.room_number]))
   const floorNameById = new Map(floorRows.map((f) => [f.id, f.name]))
   const roomIdByBedId = new Map(bedRows.map((b) => [b.id, b.room_id]))
@@ -227,7 +211,11 @@ async function fetchFromSupabase(): Promise<BuildingData> {
       id: bedRow.id,
       roomId: bedRow.room_id,
       bedLabel: bedRow.bed_label,
-      status: bedRow.status,
+      // The 'maintenance' bed status has no UI path that can ever set it —
+      // nothing writes it, so treat it as vacant if it's ever found (e.g.
+      // set manually in the DB) rather than surfacing a status the app has
+      // no way to display or clear.
+      status: bedRow.status === 'occupied' ? 'occupied' : 'vacant',
       tenant: tenantByBedId.get(bedRow.id) ?? null,
     }
     const list = bedsByRoomId.get(bedRow.room_id) ?? []
@@ -245,7 +233,7 @@ async function fetchFromSupabase(): Promise<BuildingData> {
       roomType: roomRow.room_type,
       capacity: roomRow.capacity,
       beds,
-      ...deriveRoomFlags(beds, roomsWithOpenMaintenance.has(roomRow.id)),
+      ...deriveRoomFlags(beds),
     }
     const list = roomsByFloorId.get(roomRow.floor_id) ?? []
     list.push(room)

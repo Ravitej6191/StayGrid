@@ -130,7 +130,14 @@ export function AddRoomSheet({ open, onOpenChange, floorId, floorLabel, existing
               name="roomType"
               control={control}
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+                // key={field.value} forces Radix's Select to remount instead
+                // of receiving the new value as a prop change — when the
+                // value is set programmatically (react-hook-form's reset()
+                // when editing an existing room) rather than by the user
+                // opening the dropdown, Radix doesn't recognize it and
+                // silently fires onValueChange('') to "correct" itself,
+                // wiping the value we just set. Remounting sidesteps that.
+                <Select key={field.value} value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>

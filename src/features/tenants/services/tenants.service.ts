@@ -16,7 +16,7 @@ import {
   type UpdateTenantInput as DemoUpdateTenantInput,
 } from '@/lib/demo-store'
 import { pushSupabaseNotification } from '@/features/notifications/services/notifications.service'
-import { formatCurrency, monthKey } from '@/utils/format'
+import { formatCurrency, monthKey, todayIso } from '@/utils/format'
 import type { PaymentMode, RentStatus, TenantRow } from '@/types/database.types'
 import type { Tenant } from '@/types/domain'
 
@@ -361,7 +361,7 @@ export async function vacateTenant(tenantId: string): Promise<void> {
 
   const { error: tenantError } = await supabase
     .from('tenants')
-    .update({ status: 'vacated', vacating_date: new Date().toISOString().slice(0, 10), bed_id: null })
+    .update({ status: 'vacated', vacating_date: todayIso(), bed_id: null })
     .eq('id', tenantId)
   if (tenantError) throw tenantError
 

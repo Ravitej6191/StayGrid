@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 export function BottomNav() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-card/85 shadow-[0_-8px_24px_-12px_rgb(0_0_0_/_0.15)] backdrop-blur-lg md:hidden">
       <ul className="mx-auto flex max-w-lg items-stretch justify-between px-2 pb-[calc(env(safe-area-inset-bottom))]">
         {bottomNavItems.map((item) => (
           <li key={item.to} className="flex-1">

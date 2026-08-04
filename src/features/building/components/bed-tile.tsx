@@ -1,4 +1,3 @@
-import { Wrench } from 'lucide-react'
 import { bedStatusTokens } from '@/constants/status'
 import { cn } from '@/lib/utils'
 import type { Bed } from '../types'
@@ -19,22 +18,16 @@ export function BedTile({ bed, onSelect }: { bed: Bed; onSelect: () => void }) {
     <button
       type="button"
       onClick={onSelect}
-      className="flex flex-col items-center gap-1.5 rounded-xl border border-border/70 bg-card/70 px-2 py-3 text-center transition-all hover:-translate-y-0.5 hover:bg-accent/50 hover:shadow-sm"
+      className="press-scale flex flex-col items-center gap-1.5 rounded-xl border border-border/70 bg-card/70 px-2 py-3 text-center transition-all duration-200 ease-[var(--ease-out-smooth)] hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/50 hover:shadow-md"
     >
       <span
         className={cn(
           'flex size-10 items-center justify-center rounded-full text-xs font-semibold ring-2 ring-offset-2 ring-offset-card',
           token.badge,
-          bed.status === 'occupied' ? 'ring-success/30' : bed.status === 'maintenance' ? 'ring-info/30' : 'ring-transparent',
+          bed.status === 'occupied' ? 'ring-success/30' : 'ring-transparent',
         )}
       >
-        {bed.status === 'maintenance' ? (
-          <Wrench className="size-4" />
-        ) : bed.tenant ? (
-          initials(bed.tenant.name)
-        ) : (
-          bed.bedLabel
-        )}
+        {bed.tenant ? initials(bed.tenant.name) : bed.bedLabel}
       </span>
       <span className="max-w-full truncate text-[11px] font-medium text-foreground">
         {bed.tenant ? bed.tenant.name : `Bed ${bed.bedLabel}`}

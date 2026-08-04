@@ -64,10 +64,10 @@ export function TenantsPage() {
                     type="button"
                     onClick={() => setFilter(f.value)}
                     className={cn(
-                      'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors',
+                      'press-scale shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all duration-200',
                       filter === f.value
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border/70 text-muted-foreground hover:text-foreground',
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm shadow-primary/20'
+                        : 'border-border/70 text-muted-foreground hover:border-border hover:text-foreground',
                     )}
                   >
                     {f.label}

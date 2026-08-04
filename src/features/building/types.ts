@@ -1,12 +1,12 @@
-import type { BedStatus, PropertyType, RoomType } from '@/types/database.types'
+import type { PropertyType, RoomType } from '@/types/database.types'
 import type { Tenant } from '@/types/domain'
-import type { OccupancyStatus } from '@/constants/status'
+import type { BedCardStatus, OccupancyStatus } from '@/constants/status'
 
 export interface Bed {
   id: string
   roomId: string
   bedLabel: string
-  status: BedStatus
+  status: BedCardStatus
   tenant: Tenant | null
 }
 
@@ -21,7 +21,6 @@ export interface Room {
   vacantCount: number
   occupancyStatus: OccupancyStatus
   hasRentPending: boolean
-  hasMaintenance: boolean
 }
 
 /** Room type determines bed capacity directly except Dorm, where the owner

@@ -2,7 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
-import { Bell, IndianRupee, ListX, Megaphone, UserPlus, Wallet, Wrench } from 'lucide-react'
+import { Bell, IndianRupee, ListX, Megaphone, UserPlus, Wallet } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -18,7 +18,6 @@ import { usePageHeaderAction } from '@/hooks/use-page-header-action'
 const typeIcons: Record<NotificationType, LucideIcon> = {
   tenant: UserPlus,
   payment: IndianRupee,
-  maintenance: Wrench,
   expense: Wallet,
   broadcast: Megaphone,
 }
@@ -74,7 +73,7 @@ export function NotificationsPage() {
             ))}
           </div>
         ) : !notifications || notifications.length === 0 ? (
-          <EmptyState icon={Bell} title="No notifications" description="Activity like new tenants, payments, and maintenance will show up here." />
+          <EmptyState icon={Bell} title="No notifications" description="Activity like new tenants, payments, and broadcasts will show up here." />
         ) : (
           <>
             <div className="space-y-2">
