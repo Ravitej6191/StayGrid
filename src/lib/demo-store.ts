@@ -1,14 +1,14 @@
 import type {
   ExpenseCategory,
+  HouseType,
+  LenderType,
   PaymentMode,
   PropertyType,
   RentStatus,
-  RoomType,
   TenantStatus,
 } from '@/types/database.types'
 import type { Tenant } from '@/types/domain'
 import { formatCurrency, monthKey as localMonthKey, todayIso } from '@/utils/format'
-import { areNotificationsEnabled } from './notification-prefs'
 
 /**
  * Local, mutable "demo database" — a single localStorage-persisted JSON
@@ -19,7 +19,7 @@ import { areNotificationsEnabled } from './notification-prefs'
  * mutations will use later, so swapping in a real backend is additive.
  */
 
-const STORAGE_KEY = 'staygrid.demoDb'
+const STORAGE_KEY = 'jeevanam.demoDb'
 const BUILDING_ID = 'bld-1'
 
 /** Sums a tenant's payments for the given `forMonth` (YYYY-MM-01) and derives
@@ -42,8 +42,6 @@ export interface DemoBuilding {
   pincode: string
   contactPhone: string
   contactEmail: string
-  gstNumber: string | null
-  panNumber: string | null
 }
 
 export interface DemoFloor {
@@ -53,34 +51,24 @@ export interface DemoFloor {
   name: string
 }
 
-export interface DemoRoom {
+/** A floor's individually rentable unit. Holds at most one active tenant. */
+export interface DemoHouse {
   id: string
   floorId: string
-  roomNumber: string
-  roomType: RoomType
-  capacity: number
-}
-
-export interface DemoBed {
-  id: string
-  roomId: string
-  bedLabel: string
-  status: 'vacant' | 'occupied'
+  houseNumber: string
+  houseType: HouseType
+  gasConnectionNumber: string | null
+  electricityBillNumber: string | null
 }
 
 export interface DemoTenant {
   id: string
-  bedId: string | null
+  houseId: string | null
   name: string
   phone: string
-  email: string | null
   aadhaarNumber: string | null
-  emergencyContactName: string | null
-  emergencyContactPhone: string | null
   address: string | null
   occupation: string | null
-  company: string | null
-  bloodGroup: string | null
   photoUrl: string | null
   joiningDate: string
   vacatingDate: string | null
@@ -124,9 +112,30 @@ export interface DemoExpense {
   amount: number
   expenseDate: string
   description: string | null
-  imageUrl: string | null
+  imageUrls: string[]
   /** When this expense was actually recorded — distinct from `expenseDate`,
    * which the user can backdate. Carries the real time of day. */
+  createdAt: string
+}
+
+export interface DemoLoan {
+  id: string
+  lenderType: LenderType
+  lenderName: string | null
+  amount: number
+  interestNote: string | null
+  takenOn: string
+  takenTill: string | null
+  notes: string | null
+  createdAt: string
+}
+
+export interface DemoLoanRepayment {
+  id: string
+  loanId: string
+  amount: number
+  paymentDate: string
+  notes: string | null
   createdAt: string
 }
 
@@ -161,10 +170,11 @@ export interface DemoDb {
   settings: DemoSettings
   building: DemoBuilding
   floors: DemoFloor[]
-  rooms: DemoRoom[]
-  beds: DemoBed[]
+  houses: DemoHouse[]
   tenants: DemoTenant[]
   payments: DemoPayment[]
+  loans: DemoLoan[]
+  loanRepayments: DemoLoanRepayment[]
   expenses: DemoExpense[]
   broadcasts: DemoBroadcast[]
   notifications: DemoNotification[]
@@ -183,14 +193,13 @@ function emptyDb(): DemoDb {
       pincode: '',
       contactPhone: '',
       contactEmail: '',
-      gstNumber: null,
-      panNumber: null,
     },
     floors: [],
-    rooms: [],
-    beds: [],
+    houses: [],
     tenants: [],
     payments: [],
+    loans: [],
+    loanRepayments: [],
     expenses: [],
     broadcasts: [],
     notifications: [],
@@ -248,8 +257,6 @@ export interface OnboardingSeedInput {
   pincode: string
   ownerName: string
   phone: string
-  gstNumber: string | null
-  panNumber: string | null
 }
 
 export function seedFromOnboarding(input: OnboardingSeedInput): DemoDb {
@@ -265,14 +272,13 @@ export function seedFromOnboarding(input: OnboardingSeedInput): DemoDb {
       pincode: input.pincode,
       contactPhone: input.phone,
       contactEmail: '',
-      gstNumber: input.gstNumber,
-      panNumber: input.panNumber,
     },
     floors: [],
-    rooms: [],
-    beds: [],
+    houses: [],
     tenants: [],
     payments: [],
+    loans: [],
+    loanRepayments: [],
     expenses: [],
     broadcasts: [],
     notifications: [],
@@ -304,9 +310,8 @@ export function updateFloor(floorId: string, name: string): void {
 
 export function deleteFloor(floorId: string): void {
   const db = getDemoDb()
-  const roomIds = db.rooms.filter((r) => r.floorId === floorId).map((r) => r.id)
-  const bedIds = new Set(db.beds.filter((b) => roomIds.includes(b.roomId)).map((b) => b.id))
-  const hasActiveTenant = db.tenants.some((t) => t.status === 'active' && t.bedId !== null && bedIds.has(t.bedId))
+  const houseIds = new Set(db.houses.filter((h) => h.floorId === floorId).map((h) => h.id))
+  const hasActiveTenant = db.tenants.some((t) => t.status === 'active' && t.houseId !== null && houseIds.has(t.houseId))
   if (hasActiveTenant) {
     throw new Error('Move or vacate tenants on this floor before deleting it.')
   }
@@ -314,99 +319,66 @@ export function deleteFloor(floorId: string): void {
   updateDemoDb((current) => ({
     ...current,
     floors: current.floors.filter((f) => f.id !== floorId),
-    rooms: current.rooms.filter((r) => r.floorId !== floorId),
-    beds: current.beds.filter((b) => !roomIds.includes(b.roomId)),
+    houses: current.houses.filter((h) => h.floorId !== floorId),
   }))
 }
 
-export interface AddRoomInput {
+export interface AddHouseInput {
   floorId: string
-  roomNumber: string
-  roomType: RoomType
-  capacity: number
+  houseNumber: string
+  houseType: HouseType
+  gasConnectionNumber: string | null
+  electricityBillNumber: string | null
 }
 
-export function addRoom(input: AddRoomInput): { room: DemoRoom; beds: DemoBed[] } {
-  const room: DemoRoom = {
+export function addHouse(input: AddHouseInput): DemoHouse {
+  const house: DemoHouse = {
     id: crypto.randomUUID(),
     floorId: input.floorId,
-    roomNumber: input.roomNumber,
-    roomType: input.roomType,
-    capacity: input.capacity,
+    houseNumber: input.houseNumber,
+    houseType: input.houseType,
+    gasConnectionNumber: input.gasConnectionNumber,
+    electricityBillNumber: input.electricityBillNumber,
   }
-
-  const beds: DemoBed[] = Array.from({ length: input.capacity }, (_, i) => ({
-    id: crypto.randomUUID(),
-    roomId: room.id,
-    bedLabel: String.fromCharCode(65 + i),
-    status: 'vacant',
-  }))
-
-  updateDemoDb((db) => ({ ...db, rooms: [...db.rooms, room], beds: [...db.beds, ...beds] }))
-  return { room, beds }
+  updateDemoDb((db) => ({ ...db, houses: [...db.houses, house] }))
+  return house
 }
 
-function nextBedLabelIndex(existingLabels: string[]): number {
-  let maxIndex = -1
-  for (const label of existingLabels) {
-    const index = label.charCodeAt(0) - 65
-    if (index > maxIndex) maxIndex = index
-  }
-  return maxIndex + 1
-}
-
-export interface UpdateRoomInput {
+export interface UpdateHouseInput {
   id: string
-  roomNumber: string
-  roomType: RoomType
-  capacity: number
+  houseNumber: string
+  houseType: HouseType
+  gasConnectionNumber: string | null
+  electricityBillNumber: string | null
 }
 
-export function updateRoom(input: UpdateRoomInput): void {
-  const db = getDemoDb()
-  const existingBeds = db.beds.filter((b) => b.roomId === input.id)
-  let beds = db.beds
-
-  if (input.capacity > existingBeds.length) {
-    const nextLabelStart = nextBedLabelIndex(existingBeds.map((b) => b.bedLabel))
-    const newBeds: DemoBed[] = Array.from({ length: input.capacity - existingBeds.length }, (_, i) => ({
-      id: crypto.randomUUID(),
-      roomId: input.id,
-      bedLabel: String.fromCharCode(65 + nextLabelStart + i),
-      status: 'vacant',
-    }))
-    beds = [...db.beds, ...newBeds]
-  } else if (input.capacity < existingBeds.length) {
-    const removeCount = existingBeds.length - input.capacity
-    const removableBeds = existingBeds.filter((b) => b.status === 'vacant')
-    if (removableBeds.length < removeCount) {
-      throw new Error('Vacate tenants before reducing the bed count.')
-    }
-    const idsToRemove = new Set(removableBeds.slice(0, removeCount).map((b) => b.id))
-    beds = db.beds.filter((b) => !idsToRemove.has(b.id))
-  }
-
+export function updateHouse(input: UpdateHouseInput): void {
   updateDemoDb((current) => ({
     ...current,
-    rooms: current.rooms.map((r) =>
-      r.id === input.id ? { ...r, roomNumber: input.roomNumber, roomType: input.roomType, capacity: input.capacity } : r,
+    houses: current.houses.map((h) =>
+      h.id === input.id
+        ? {
+            ...h,
+            houseNumber: input.houseNumber,
+            houseType: input.houseType,
+            gasConnectionNumber: input.gasConnectionNumber,
+            electricityBillNumber: input.electricityBillNumber,
+          }
+        : h,
     ),
-    beds,
   }))
 }
 
-export function deleteRoom(roomId: string): void {
+export function deleteHouse(houseId: string): void {
   const db = getDemoDb()
-  const bedIds = new Set(db.beds.filter((b) => b.roomId === roomId).map((b) => b.id))
-  const hasActiveTenant = db.tenants.some((t) => t.status === 'active' && t.bedId !== null && bedIds.has(t.bedId))
+  const hasActiveTenant = db.tenants.some((t) => t.status === 'active' && t.houseId === houseId)
   if (hasActiveTenant) {
-    throw new Error('Move or vacate tenants in this room before deleting it.')
+    throw new Error('Move or vacate tenants in this house before deleting it.')
   }
 
   updateDemoDb((current) => ({
     ...current,
-    rooms: current.rooms.filter((r) => r.id !== roomId),
-    beds: current.beds.filter((b) => b.roomId !== roomId),
+    houses: current.houses.filter((h) => h.id !== houseId),
   }))
 }
 
@@ -418,36 +390,31 @@ export function updateBuildingProfile(patch: Partial<DemoBuilding> & { ownerName
   }))
 }
 
-/** Joins a stored tenant record with its bed → room → floor to produce the
+/** Joins a stored tenant record with its house → floor to produce the
  * canonical `Tenant` domain shape shared by Building and the Tenants feature. */
 export function resolveTenant(db: DemoDb, demoTenant: DemoTenant): Tenant {
-  const bed = demoTenant.bedId ? db.beds.find((b) => b.id === demoTenant.bedId) : undefined
-  const room = bed ? db.rooms.find((r) => r.id === bed.roomId) : undefined
-  const floor = room ? db.floors.find((f) => f.id === room.floorId) : undefined
+  const house = demoTenant.houseId ? db.houses.find((h) => h.id === demoTenant.houseId) : undefined
+  const floor = house ? db.floors.find((f) => f.id === house.floorId) : undefined
+  const currentMonthForMonth = `${localMonthKey(new Date())}-01`
+  const rentStatus = computeMonthlyRentStatus(db.payments, demoTenant.id, currentMonthForMonth, demoTenant.rent)
 
   return {
     id: demoTenant.id,
-    bedId: demoTenant.bedId,
-    roomId: room?.id ?? '',
-    roomNumber: room?.roomNumber ?? '',
+    houseId: demoTenant.houseId,
+    houseNumber: house?.houseNumber ?? '',
     floorName: floor?.name ?? '',
     name: demoTenant.name,
     phone: demoTenant.phone,
-    email: demoTenant.email,
     aadhaarNumber: demoTenant.aadhaarNumber,
-    emergencyContactName: demoTenant.emergencyContactName,
-    emergencyContactPhone: demoTenant.emergencyContactPhone,
     address: demoTenant.address,
     occupation: demoTenant.occupation,
-    company: demoTenant.company,
-    bloodGroup: demoTenant.bloodGroup,
     photoUrl: demoTenant.photoUrl,
     joiningDate: demoTenant.joiningDate,
     vacatingDate: demoTenant.vacatingDate,
     advance: demoTenant.advance,
     deposit: demoTenant.deposit,
     rent: demoTenant.rent,
-    rentStatus: demoTenant.rentStatus,
+    rentStatus,
     status: demoTenant.status,
     notes: demoTenant.notes,
     depositRecord: demoTenant.depositRecord,
@@ -455,7 +422,6 @@ export function resolveTenant(db: DemoDb, demoTenant: DemoTenant): Tenant {
 }
 
 function pushNotification(type: NotificationType, title: string, message: string): void {
-  if (!areNotificationsEnabled()) return
   const notification: DemoNotification = {
     id: crypto.randomUUID(),
     type,
@@ -480,41 +446,31 @@ export function markAllNotificationsRead(): void {
 }
 
 export interface AddTenantInput {
-  bedId: string | null
+  houseId: string | null
   name: string
   phone: string
-  email: string | null
   aadhaarNumber: string | null
-  emergencyContactName: string | null
-  emergencyContactPhone: string | null
-  bloodGroup: string | null
   occupation: string | null
-  company: string | null
   photoUrl: string | null
   rent: number
   deposit: number
 }
 
 export function addTenant(input: AddTenantInput): DemoTenant {
-  if (input.bedId) {
-    const db = getDemoDb()
-    const bed = db.beds.find((b) => b.id === input.bedId)
-    if (bed?.status === 'occupied') throw new Error('That bed is already occupied.')
+  const db = getDemoDb()
+  if (input.houseId) {
+    const isOccupied = db.tenants.some((t) => t.status === 'active' && t.houseId === input.houseId)
+    if (isOccupied) throw new Error('That house is already occupied.')
   }
 
   const tenant: DemoTenant = {
     id: crypto.randomUUID(),
-    bedId: input.bedId,
+    houseId: input.houseId,
     name: input.name,
     phone: input.phone,
-    email: input.email,
     aadhaarNumber: input.aadhaarNumber,
-    emergencyContactName: input.emergencyContactName,
-    emergencyContactPhone: input.emergencyContactPhone,
     address: null,
     occupation: input.occupation,
-    company: input.company,
-    bloodGroup: input.bloodGroup,
     photoUrl: input.photoUrl,
     joiningDate: todayIso(),
     vacatingDate: null,
@@ -527,11 +483,7 @@ export function addTenant(input: AddTenantInput): DemoTenant {
     depositRecord: null,
   }
 
-  updateDemoDb((db) => ({
-    ...db,
-    tenants: [...db.tenants, tenant],
-    beds: input.bedId ? db.beds.map((b) => (b.id === input.bedId ? { ...b, status: 'occupied' } : b)) : db.beds,
-  }))
+  updateDemoDb((db) => ({ ...db, tenants: [...db.tenants, tenant] }))
 
   pushNotification('tenant', 'Tenant added', `${input.name} was added as a tenant.`)
 
@@ -542,13 +494,8 @@ export interface UpdateTenantInput {
   id: string
   name: string
   phone: string
-  email: string | null
   aadhaarNumber: string | null
-  emergencyContactName: string | null
-  emergencyContactPhone: string | null
-  bloodGroup: string | null
   occupation: string | null
-  company: string | null
   photoUrl: string | null
   rent: number
   deposit: number
@@ -571,13 +518,8 @@ export function updateTenant(input: UpdateTenantInput): void {
               ...t,
               name: input.name,
               phone: input.phone,
-              email: input.email,
               aadhaarNumber: input.aadhaarNumber,
-              emergencyContactName: input.emergencyContactName,
-              emergencyContactPhone: input.emergencyContactPhone,
-              bloodGroup: input.bloodGroup,
               occupation: input.occupation,
-              company: input.company,
               photoUrl: input.photoUrl,
               rent: input.rent,
               deposit: input.deposit,
@@ -589,56 +531,39 @@ export function updateTenant(input: UpdateTenantInput): void {
   })
 }
 
-export function reassignTenant(tenantId: string, newBedId: string): void {
+export function reassignTenant(tenantId: string, newHouseId: string): void {
   updateDemoDb((db) => {
-    const tenant = db.tenants.find((t) => t.id === tenantId)
-    const oldBedId = tenant?.bedId ?? null
-    const targetBed = db.beds.find((b) => b.id === newBedId)
-    if (targetBed?.status === 'occupied' && newBedId !== oldBedId) {
-      throw new Error('That bed is already occupied.')
+    const isOccupied = db.tenants.some(
+      (t) => t.status === 'active' && t.houseId === newHouseId && t.id !== tenantId,
+    )
+    if (isOccupied) {
+      throw new Error('That house is already occupied.')
     }
     return {
       ...db,
-      tenants: db.tenants.map((t) => (t.id === tenantId ? { ...t, bedId: newBedId } : t)),
-      beds: db.beds.map((b) => {
-        if (b.id === newBedId) return { ...b, status: 'occupied' }
-        if (b.id === oldBedId) return { ...b, status: 'vacant' }
-        return b
-      }),
+      tenants: db.tenants.map((t) => (t.id === tenantId ? { ...t, houseId: newHouseId } : t)),
     }
   })
 }
 
-/** Frees the tenant's bed but keeps them active and unassigned — distinct
+/** Frees the tenant's house but keeps them active and unassigned — distinct
  * from `vacateTenant`, which ends their stay entirely. Lets an owner pull a
- * tenant out of a room without losing their record (e.g. re-allotting them
+ * tenant out of a house without losing their record (e.g. re-allotting them
  * elsewhere later). */
 export function unassignTenant(tenantId: string): void {
-  updateDemoDb((db) => {
-    const tenant = db.tenants.find((t) => t.id === tenantId)
-    const bedId = tenant?.bedId ?? null
-    return {
-      ...db,
-      tenants: db.tenants.map((t) => (t.id === tenantId ? { ...t, bedId: null } : t)),
-      beds: db.beds.map((b) => (b.id === bedId ? { ...b, status: 'vacant' } : b)),
-    }
-  })
+  updateDemoDb((db) => ({
+    ...db,
+    tenants: db.tenants.map((t) => (t.id === tenantId ? { ...t, houseId: null } : t)),
+  }))
 }
 
 export function vacateTenant(tenantId: string): void {
-  updateDemoDb((db) => {
-    const tenant = db.tenants.find((t) => t.id === tenantId)
-    const bedId = tenant?.bedId ?? null
-    return {
-      ...db,
-      tenants: db.tenants.map((t) =>
-        t.id === tenantId
-          ? { ...t, status: 'vacated', vacatingDate: todayIso(), bedId: null }
-          : t,
-      ),
-      beds: db.beds.map((b) => (b.id === bedId ? { ...b, status: 'vacant' } : b)),
-    }
-  })
+  updateDemoDb((db) => ({
+    ...db,
+    tenants: db.tenants.map((t) =>
+      t.id === tenantId ? { ...t, status: 'vacated', vacatingDate: todayIso(), houseId: null } : t,
+    ),
+  }))
 }
 
 export interface RecordPaymentInput {
@@ -742,12 +667,86 @@ export function recordDeposit(input: RecordDepositInput): void {
   pushNotification('payment', 'Deposit recorded', `${formatCurrency(input.amount)} deposit recorded for ${tenant?.name ?? 'a tenant'}.`)
 }
 
+export function deleteDeposit(tenantId: string): void {
+  updateDemoDb((db) => ({
+    ...db,
+    tenants: db.tenants.map((t) => (t.id === tenantId ? { ...t, depositRecord: null } : t)),
+  }))
+}
+
+export interface AddLoanInput {
+  lenderType: LenderType
+  lenderName: string | null
+  amount: number
+  interestNote: string | null
+  takenOn: string
+  takenTill: string | null
+  notes: string | null
+}
+
+export function addLoan(input: AddLoanInput): DemoLoan {
+  const loan: DemoLoan = { id: crypto.randomUUID(), ...input, createdAt: new Date().toISOString() }
+  updateDemoDb((db) => ({ ...db, loans: [...db.loans, loan] }))
+  pushNotification('expense', 'Loan added', `${formatCurrency(input.amount)} loan recorded.`)
+  return loan
+}
+
+export interface UpdateLoanInput extends AddLoanInput {
+  id: string
+}
+
+export function updateLoan(input: UpdateLoanInput): void {
+  updateDemoDb((db) => ({
+    ...db,
+    loans: db.loans.map((l) =>
+      l.id === input.id
+        ? {
+            ...l,
+            lenderType: input.lenderType,
+            lenderName: input.lenderName,
+            amount: input.amount,
+            interestNote: input.interestNote,
+            takenOn: input.takenOn,
+            takenTill: input.takenTill,
+            notes: input.notes,
+          }
+        : l,
+    ),
+  }))
+}
+
+export function deleteLoan(loanId: string): void {
+  updateDemoDb((db) => ({
+    ...db,
+    loans: db.loans.filter((l) => l.id !== loanId),
+    loanRepayments: db.loanRepayments.filter((r) => r.loanId !== loanId),
+  }))
+}
+
+export interface AddLoanRepaymentInput {
+  loanId: string
+  amount: number
+  paymentDate: string
+  notes: string | null
+}
+
+export function addLoanRepayment(input: AddLoanRepaymentInput): DemoLoanRepayment {
+  const repayment: DemoLoanRepayment = { id: crypto.randomUUID(), ...input, createdAt: new Date().toISOString() }
+  updateDemoDb((db) => ({ ...db, loanRepayments: [...db.loanRepayments, repayment] }))
+  pushNotification('expense', 'Loan repayment recorded', `${formatCurrency(input.amount)} repaid towards a loan.`)
+  return repayment
+}
+
+export function deleteLoanRepayment(repaymentId: string): void {
+  updateDemoDb((db) => ({ ...db, loanRepayments: db.loanRepayments.filter((r) => r.id !== repaymentId) }))
+}
+
 export interface AddExpenseInput {
   category: ExpenseCategory
   amount: number
   expenseDate: string
   description: string | null
-  imageUrl: string | null
+  imageUrls: string[]
 }
 
 export function addExpense(input: AddExpenseInput): DemoExpense {
@@ -772,7 +771,7 @@ export function updateExpense(input: UpdateExpenseInput): void {
             amount: input.amount,
             expenseDate: input.expenseDate,
             description: input.description,
-            imageUrl: input.imageUrl,
+            imageUrls: input.imageUrls,
           }
         : e,
     ),

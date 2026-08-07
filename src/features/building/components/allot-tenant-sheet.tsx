@@ -1,22 +1,24 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Search, UserRound, Users } from 'lucide-react'
+import { Loader2, Plus, Search, UserRound, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/common/empty-state'
 import { useTenants } from '@/features/tenants/hooks/use-tenants'
 import { reassignTenant } from '@/features/tenants/services/tenants.service'
-import type { Bed, Room } from '../types'
+import type { House } from '../types'
 
 interface AllotTenantSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  room: Room | null
-  bed: Bed | null
+  house: House | null
 }
 
-export function AllotTenantSheet({ open, onOpenChange, room, bed }: AllotTenantSheetProps) {
+export function AllotTenantSheet({ open, onOpenChange, house }: AllotTenantSheetProps) {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: tenants, isLoading } = useTenants()
   const [search, setSearch] = useState('')
@@ -25,14 +27,14 @@ export function AllotTenantSheet({ open, onOpenChange, room, bed }: AllotTenantS
     if (!open) setSearch('')
   }, [open])
 
-  const unallotted = (tenants ?? []).filter((t) => t.status === 'active' && t.bedId === null)
+  const unallotted = (tenants ?? []).filter((t) => t.status === 'active' && t.houseId === null)
   const query = search.trim().toLowerCase()
   const filtered = query
     ? unallotted.filter((t) => t.name.toLowerCase().includes(query) || t.phone.includes(query))
     : unallotted
 
   const mutation = useMutation({
-    mutationFn: (tenantId: string) => reassignTenant(tenantId, bed!.id),
+    mutationFn: (tenantId: string) => reassignTenant(tenantId, house!.id),
     onSuccess: async (_, tenantId) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['building'] }),
@@ -51,13 +53,15 @@ export function AllotTenantSheet({ open, onOpenChange, room, bed }: AllotTenantS
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-xl">
         <SheetHeader>
-          <SheetTitle>
-            Allot Tenant{bed ? ` · Bed ${bed.bedLabel}` : ''}
-            {room ? ` · Room ${room.roomNumber}` : ''}
-          </SheetTitle>
+          <SheetTitle>Allot Tenant{house ? ` · House ${house.houseNumber}` : ''}</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-3 px-4 pb-8">
+          <Button variant="outline" className="w-full" onClick={() => navigate('/tenants/new')}>
+            <Plus className="size-4" />
+            Add New Tenant
+          </Button>
+
           {isLoading || unallotted.length === 0 ? null : (
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -74,7 +78,7 @@ export function AllotTenantSheet({ open, onOpenChange, room, bed }: AllotTenantS
             <EmptyState
               icon={Users}
               title="No unallotted tenants"
-              description="Add a tenant from the Tenants tab first, then come back to allot them a bed."
+              description="Add a new tenant above, then come back to allot them a house."
             />
           ) : filtered.length === 0 ? (
             <EmptyState icon={Search} title="No matches" description="Try a different search." />

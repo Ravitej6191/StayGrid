@@ -29,9 +29,8 @@ const paymentModes = [
 
 const recordSchema = z.object({
   tenantId: z.string().min(1, 'Choose a tenant'),
-  recordType: z.enum(['rent', 'deposit']),
+  recordType: z.enum(['rent', 'deposit', 'other']),
   amount: z.number().positive('Enter a valid amount').max(10_000_000, 'Amount seems too high'),
-  extraAmount: z.number().min(0).max(10_000_000, 'Amount seems too high'),
   paymentMode: z.enum(['cash', 'upi', 'bank_transfer', 'cheque']),
   paymentDate: z.string().min(1, 'Choose a date'),
   notes: z.string(),
@@ -43,7 +42,6 @@ const emptyValues = (defaultTenantId?: string): RecordFormValues => ({
   tenantId: defaultTenantId ?? '',
   recordType: 'rent',
   amount: 0,
-  extraAmount: 0,
   paymentMode: 'cash',
   paymentDate: todayIso(),
   notes: '',
@@ -95,6 +93,10 @@ export function RecordPaymentPage() {
     if (!selectedTenant) return
     if (recordType === 'rent') {
       setValue('amount', selectedTenant.rent)
+      setScreenshotFile(null)
+      setScreenshotPreview(null)
+    } else if (recordType === 'other') {
+      setValue('amount', 0)
       setScreenshotFile(null)
       setScreenshotPreview(null)
     } else {
@@ -165,7 +167,7 @@ export function RecordPaymentPage() {
       const forMonth = monthKeyOfDateString(values.paymentDate) + '-01'
       rentMutation.mutate({
         tenantId: values.tenantId,
-        amount: values.amount + (values.extraAmount || 0),
+        amount: values.amount,
         paymentMode: values.paymentMode,
         paymentDate: values.paymentDate,
         forMonth,
@@ -179,7 +181,6 @@ export function RecordPaymentPage() {
     setValue('tenantId', defaultTenantId ?? '')
     setValue('recordType', 'rent')
     setValue('amount', 0)
-    setValue('extraAmount', 0)
     setValue('paymentMode', 'cash')
     setValue('paymentDate', todayIso())
     setValue('notes', '')
@@ -270,8 +271,8 @@ export function RecordPaymentPage() {
           name="recordType"
           control={control}
           render={({ field }) => (
-            <div className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 p-1">
-              {(['rent', 'deposit'] as const).map((type) => (
+            <div className="grid grid-cols-3 gap-2 rounded-lg border border-border/70 p-1">
+              {(['rent', 'deposit', 'other'] as const).map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -323,14 +324,8 @@ export function RecordPaymentPage() {
         {errors.paymentDate ? <p className="text-xs text-danger">{errors.paymentDate.message}</p> : null}
       </div>
 
-      {recordType === 'rent' ? (
+      {recordType === 'rent' || recordType === 'other' ? (
         <>
-          <div className="space-y-1.5">
-            <Label htmlFor="extraAmount">Extra / Others (optional)</Label>
-            <Input id="extraAmount" type="number" disabled={alreadyPaid} {...register('extraAmount', { valueAsNumber: true })} />
-            {errors.extraAmount ? <p className="text-xs text-danger">{errors.extraAmount.message}</p> : null}
-          </div>
-
           <div className="space-y-1.5">
             <Label>Payment mode</Label>
             <Controller
@@ -360,49 +355,47 @@ export function RecordPaymentPage() {
         </>
       ) : null}
 
-      {!alreadyPaid ? (
-        <div className="space-y-1.5">
-          <Label>{recordType === 'deposit' ? 'Photo (optional)' : 'Receipt photo (optional)'}</Label>
-          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-          {screenshotPreview ? (
-            <div className="relative w-fit">
-              <img
-                src={screenshotPreview}
-                alt={recordType === 'deposit' ? 'Deposit proof' : 'Payment receipt'}
-                className="h-32 rounded-lg border border-border/70 object-cover"
-              />
-              <button
-                type="button"
-                onClick={handleRemoveScreenshot}
-                aria-label="Remove photo"
-                className="absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full bg-danger text-danger-foreground shadow-sm"
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 py-4 text-sm text-muted-foreground transition-colors hover:bg-accent/50"
-              >
-                <Camera className="size-4" />
-                Take Photo
-              </button>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 py-4 text-sm text-muted-foreground transition-colors hover:bg-accent/50"
-              >
-                <ImagePlus className="size-4" />
-                Upload Image
-              </button>
-            </div>
-          )}
-        </div>
-      ) : null}
+      <div className="space-y-1.5">
+        <Label>Photo (optional)</Label>
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        {screenshotPreview ? (
+          <div className="relative w-fit">
+            <img
+              src={screenshotPreview}
+              alt="Payment photo"
+              className="h-32 rounded-lg border border-border/70 object-cover"
+            />
+            <button
+              type="button"
+              onClick={handleRemoveScreenshot}
+              aria-label="Remove photo"
+              className="absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full bg-danger text-danger-foreground shadow-sm"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 py-4 text-sm text-muted-foreground transition-colors hover:bg-accent/50"
+            >
+              <Camera className="size-4" />
+              Take Photo
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 py-4 text-sm text-muted-foreground transition-colors hover:bg-accent/50"
+            >
+              <ImagePlus className="size-4" />
+              Upload Image
+            </button>
+          </div>
+        )}
+      </div>
 
       <Button type="submit" className="w-full" disabled={isPending || alreadyPaid || !selectedTenantId}>
         {isPending ? <Loader2 className="size-4 animate-spin" /> : null}

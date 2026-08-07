@@ -10,7 +10,7 @@ interface PageHeaderState {
 }
 
 export const usePageHeaderStore = create<PageHeaderState>((set) => ({
-  title: 'StayGrid',
+  title: 'Jeevanam',
   onBack: null,
   action: null,
   setPageHeader: (title, onBack = null) => set({ title, onBack, action: null }),

@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase'
  * resulting session automatically, same as the web flow. */
 export function initNativeAuthListener(): () => void {
   const listenerPromise = CapacitorApp.addListener('appUrlOpen', ({ url }) => {
-    if (!url.startsWith('com.staygrid.app://login-callback')) return
+    if (!url.startsWith('com.jeevanam.app://login-callback')) return
 
     void Browser.close().catch(() => {})
 

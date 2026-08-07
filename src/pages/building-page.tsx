@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BedDouble, Building2, CircleDashed, Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { Building2, Home, Pencil, Plus, Trash2, UserPlus, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { ErrorState } from '@/components/common/error-state'
 import { EmptyState } from '@/components/common/empty-state'
@@ -9,30 +9,30 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBuildingData } from '@/features/building/hooks/use-building-data'
-import { RoomGrid } from '@/features/building/components/room-grid'
-import { RoomDetailSheet } from '@/features/building/components/room-detail-sheet'
+import { HouseGrid } from '@/features/building/components/house-grid'
+import { HouseDetailSheet } from '@/features/building/components/house-detail-sheet'
 import { AddFloorSheet } from '@/features/building/components/add-floor-sheet'
 import { DeleteFloorDialog } from '@/features/building/components/delete-floor-dialog'
-import { AddRoomSheet } from '@/features/building/components/add-room-sheet'
-import { DeleteRoomDialog } from '@/features/building/components/delete-room-dialog'
+import { AddHouseSheet } from '@/features/building/components/add-house-sheet'
+import { DeleteHouseDialog } from '@/features/building/components/delete-house-dialog'
 import { AllotTenantSheet } from '@/features/building/components/allot-tenant-sheet'
 import { useUiStore } from '@/store/ui-store'
 import { usePageTitle } from '@/hooks/use-page-title'
-import type { Bed, Floor, Room } from '@/features/building/types'
+import type { Floor, House } from '@/features/building/types'
 
 export function BuildingPage() {
   const navigate = useNavigate()
   usePageTitle('Building', () => navigate(-1))
   const { data, isLoading, isError, refetch } = useBuildingData()
-  const selectedRoomId = useUiStore((s) => s.selectedRoomId)
-  const setSelectedRoomId = useUiStore((s) => s.setSelectedRoomId)
-  const [allotTarget, setAllotTarget] = useState<{ room: Room; bed: Bed } | null>(null)
+  const selectedHouseId = useUiStore((s) => s.selectedHouseId)
+  const setSelectedHouseId = useUiStore((s) => s.setSelectedHouseId)
+  const [allotTarget, setAllotTarget] = useState<House | null>(null)
   const [addFloorOpen, setAddFloorOpen] = useState(false)
   const [editFloor, setEditFloor] = useState<Floor | null>(null)
   const [deleteFloorTarget, setDeleteFloorTarget] = useState<Floor | null>(null)
-  const [addRoomFloor, setAddRoomFloor] = useState<Floor | null>(null)
-  const [editRoom, setEditRoom] = useState<Room | null>(null)
-  const [deleteRoomTarget, setDeleteRoomTarget] = useState<Room | null>(null)
+  const [addHouseFloor, setAddHouseFloor] = useState<Floor | null>(null)
+  const [editHouse, setEditHouse] = useState<House | null>(null)
+  const [deleteHouseTarget, setDeleteHouseTarget] = useState<House | null>(null)
   const [expandedFloors, setExpandedFloors] = useState<string[]>([])
   const knownFloorIds = useRef(new Set<string>())
 
@@ -44,14 +44,14 @@ export function BuildingPage() {
     setExpandedFloors((current) => [...current, ...newIds])
   }, [data])
 
-  const activeRoomWithFloor = useMemo(() => {
-    if (!data || !selectedRoomId) return null
+  const activeHouseWithFloor = useMemo(() => {
+    if (!data || !selectedHouseId) return null
     for (const floor of data.floors) {
-      const room = floor.rooms.find((r) => r.id === selectedRoomId)
-      if (room) return { room, floorName: floor.name }
+      const house = floor.houses.find((h) => h.id === selectedHouseId)
+      if (house) return { house, floorName: floor.name }
     }
     return null
-  }, [data, selectedRoomId])
+  }, [data, selectedHouseId])
 
   const nextFloorNumber = useMemo(
     () => (data && data.floors.length > 0 ? Math.max(...data.floors.map((f) => f.floorNumber)) + 1 : 0),
@@ -59,21 +59,17 @@ export function BuildingPage() {
   )
 
   const kpis = useMemo(() => {
-    if (!data) return { occupied: 0, partial: 0, vacant: 0 }
+    if (!data) return { occupied: 0 }
     let occupied = 0
-    let partial = 0
-    let vacant = 0
     for (const floor of data.floors) {
-      for (const room of floor.rooms) {
-        if (room.occupancyStatus === 'occupied') occupied += 1
-        else if (room.occupancyStatus === 'partial') partial += 1
-        else vacant += 1
+      for (const house of floor.houses) {
+        if (house.occupancyStatus === 'occupied') occupied += 1
       }
     }
-    return { occupied, partial, vacant }
+    return { occupied }
   }, [data])
 
-  const roomSheetFloorId = editRoom?.floorId ?? addRoomFloor?.id ?? null
+  const houseSheetFloorId = editHouse?.floorId ?? addHouseFloor?.id ?? null
 
   return (
     <PullToRefresh onRefresh={refetch}>
@@ -86,15 +82,20 @@ export function BuildingPage() {
           <EmptyState
             icon={Building2}
             title="No floors yet"
-            description="Add your first floor to start setting up rooms."
+            description="Add your first floor to start setting up houses."
             action={<Button onClick={() => setAddFloorOpen(true)}>Add Floor</Button>}
           />
         ) : (
           <>
             <div className="grid grid-cols-4 gap-2">
-              <KpiTile label="Occupied" value={kpis.occupied} icon={Users} tone="text-success" />
-              <KpiTile label="Partial" value={kpis.partial} icon={CircleDashed} tone="text-warning" />
-              <KpiTile label="Vacant" value={kpis.vacant} icon={BedDouble} tone="text-neutral-foreground" />
+              <KpiTile label="Occupied" value={kpis.occupied} icon={Home} tone="text-success" />
+              <KpiTile
+                label="Tenants"
+                value={kpis.occupied}
+                icon={Users}
+                tone="text-info"
+                onClick={() => navigate('/tenants')}
+              />
               <button
                 type="button"
                 onClick={() => setAddFloorOpen(true)}
@@ -102,6 +103,14 @@ export function BuildingPage() {
               >
                 <Plus className="size-4" />
                 <span className="text-[11px] font-medium">Add Floor</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/tenants/new')}
+                className="press-scale flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-primary/30 bg-card py-2.5 text-primary transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/5 hover:shadow-sm"
+              >
+                <UserPlus className="size-4" />
+                <span className="text-[11px] font-medium">Add Tenant</span>
               </button>
             </div>
 
@@ -116,7 +125,7 @@ export function BuildingPage() {
                     <span className="flex flex-1 items-baseline gap-2 py-1.5">
                       <span className="text-sm font-semibold text-foreground">{floor.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        {floor.rooms.length} room{floor.rooms.length === 1 ? '' : 's'}
+                        {floor.houses.length} house{floor.houses.length === 1 ? '' : 's'}
                       </span>
                     </span>
                     <div className="flex items-center gap-0.5">
@@ -136,53 +145,52 @@ export function BuildingPage() {
                       >
                         <Trash2 className="size-3.5" />
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddHouseFloor(floor)}
+                        aria-label="Add house"
+                        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
                       <AccordionTrigger className="w-auto p-1.5 hover:no-underline" />
                     </div>
                   </div>
 
                   <AccordionContent>
-                    {floor.rooms.length === 0 ? (
+                    {floor.houses.length === 0 ? (
                       <EmptyState
                         icon={Building2}
-                        title="No rooms on this floor"
-                        description="Add a room to start tracking occupancy."
-                        action={
-                          <Button size="sm" onClick={() => setAddRoomFloor(floor)}>
-                            Add Room
-                          </Button>
-                        }
+                        title="No houses on this floor"
+                        description="Tap the + above to add a house and start tracking occupancy."
                       />
                     ) : (
-                      <RoomGrid
-                        rooms={floor.rooms}
-                        onSelectRoom={setSelectedRoomId}
-                        onAddRoom={() => setAddRoomFloor(floor)}
-                      />
+                      <HouseGrid houses={floor.houses} onSelectHouse={setSelectedHouseId} />
                     )}
                   </AccordionContent>
                 </AccordionItem>
               ))}
             </Accordion>
 
-            <RoomDetailSheet
-              room={activeRoomWithFloor?.room ?? null}
-              floorName={activeRoomWithFloor?.floorName ?? ''}
-              open={selectedRoomId !== null}
+            <HouseDetailSheet
+              house={activeHouseWithFloor?.house ?? null}
+              floorName={activeHouseWithFloor?.floorName ?? ''}
+              open={selectedHouseId !== null}
               onOpenChange={(open) => {
-                if (!open) setSelectedRoomId(null)
+                if (!open) setSelectedHouseId(null)
               }}
-              onAssignTenant={(room, bed) => {
-                setSelectedRoomId(null)
-                setAllotTarget({ room, bed })
+              onAssignTenant={(house) => {
+                setSelectedHouseId(null)
+                setAllotTarget(house)
               }}
               onViewTenant={(tenantId) => navigate(`/tenants/${tenantId}`)}
-              onEditRoom={(room) => {
-                setSelectedRoomId(null)
-                setEditRoom(room)
+              onEditHouse={(house) => {
+                setSelectedHouseId(null)
+                setEditHouse(house)
               }}
-              onDeleteRoom={(room) => {
-                setSelectedRoomId(null)
-                setDeleteRoomTarget(room)
+              onDeleteHouse={(house) => {
+                setSelectedHouseId(null)
+                setDeleteHouseTarget(house)
               }}
             />
           </>
@@ -206,23 +214,23 @@ export function BuildingPage() {
           floor={deleteFloorTarget}
         />
 
-        <AddRoomSheet
-          open={addRoomFloor !== null || editRoom !== null}
+        <AddHouseSheet
+          open={addHouseFloor !== null || editHouse !== null}
           onOpenChange={(open) => {
             if (!open) {
-              setAddRoomFloor(null)
-              setEditRoom(null)
+              setAddHouseFloor(null)
+              setEditHouse(null)
             }
           }}
-          floorId={roomSheetFloorId}
-          floorLabel={editRoom ? undefined : addRoomFloor?.name}
-          existingRoom={editRoom}
+          floorId={houseSheetFloorId}
+          floorLabel={editHouse ? undefined : addHouseFloor?.name}
+          existingHouse={editHouse}
         />
 
-        <DeleteRoomDialog
-          open={deleteRoomTarget !== null}
-          onOpenChange={(open) => !open && setDeleteRoomTarget(null)}
-          room={deleteRoomTarget}
+        <DeleteHouseDialog
+          open={deleteHouseTarget !== null}
+          onOpenChange={(open) => !open && setDeleteHouseTarget(null)}
+          house={deleteHouseTarget}
         />
 
         <AllotTenantSheet
@@ -230,8 +238,7 @@ export function BuildingPage() {
           onOpenChange={(open) => {
             if (!open) setAllotTarget(null)
           }}
-          room={allotTarget?.room ?? null}
-          bed={allotTarget?.bed ?? null}
+          house={allotTarget}
         />
       </div>
     </PullToRefresh>
@@ -243,20 +250,27 @@ function KpiTile({
   value,
   icon: Icon,
   tone,
+  onClick,
 }: {
   label: string
   value: number
   icon: LucideIcon
   tone: string
+  onClick?: () => void
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-border bg-card py-2.5 shadow-sm transition-shadow duration-300 hover:shadow-md">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className="press-scale flex flex-col items-center justify-center gap-1 rounded-lg border border-border bg-card py-2.5 shadow-sm transition-shadow duration-300 hover:shadow-md disabled:pointer-events-none"
+    >
       <span className="flex items-center gap-1.5">
         <Icon className={`size-3.5 ${tone}`} />
         <span className="font-numeric text-sm font-semibold text-foreground">{value}</span>
       </span>
       <span className="text-[11px] text-muted-foreground">{label}</span>
-    </div>
+    </button>
   )
 }
 

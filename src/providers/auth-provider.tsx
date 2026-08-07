@@ -1,4 +1,4 @@
-import { createContext, use, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { DEMO_MODE_KEY, isSupabaseConfigured } from '@/config/env'
 import { supabase } from '@/lib/supabase'
@@ -10,7 +10,7 @@ import type { AuthUser } from '@/features/auth/types'
 
 const demoUser: AuthUser = {
   id: 'demo-owner',
-  email: 'demo@staygrid.app',
+  email: 'demo@jeevanam.app',
   name: 'Demo Owner',
   photoUrl: null,
   phone: null,
@@ -87,15 +87,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  const continueInDemoMode = () => {
+  const continueInDemoMode = useCallback(() => {
     localStorage.setItem(DEMO_MODE_KEY, 'true')
     setIsDemoMode(true)
     setUser(demoUser)
     // Demo mode is for quick exploration — never gate it behind a PIN.
     useAppLockStore.getState().disable()
-  }
+  }, [])
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     // App Lock is tied to "this device, this session" — carrying a stale PIN
     // into the next login (demo or a different Google account) makes no
     // sense, so clear it on the way out. The next signed-in user can turn it
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOutSupabase()
     queryClient.clear()
     setUser(null)
-  }
+  }, [isDemoMode, queryClient])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       continueInDemoMode,
       logout,
     }),
-    [user, isDemoMode, isLoading],
+    [user, isDemoMode, isLoading, continueInDemoMode, logout],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

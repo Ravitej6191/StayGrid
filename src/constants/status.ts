@@ -1,11 +1,10 @@
 /**
  * Single source of truth for status → color/label mapping across the app.
- * Room/bed cards, badges, and legends all read from here instead of
+ * House cards, badges, and legends all read from here instead of
  * hardcoding Tailwind classes per component.
  */
 
 export type OccupancyStatus = 'vacant' | 'partial' | 'occupied'
-export type BedCardStatus = 'vacant' | 'occupied'
 export type RentBadgeStatus = 'paid' | 'partial' | 'pending' | 'advance'
 
 interface StatusToken {
@@ -34,11 +33,6 @@ export const occupancyStatusTokens: Record<OccupancyStatus, StatusToken> = {
     badge: 'bg-neutral/15 text-neutral-foreground border-neutral/30',
     border: 'border-l-neutral',
   },
-}
-
-export const bedStatusTokens: Record<BedCardStatus, StatusToken> = {
-  occupied: occupancyStatusTokens.occupied,
-  vacant: occupancyStatusTokens.vacant,
 }
 
 export const rentStatusTokens: Record<RentBadgeStatus, StatusToken> = {

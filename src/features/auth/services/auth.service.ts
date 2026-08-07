@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 /** Custom scheme the Android app registers an intent-filter for (see
  * android/app/src/main/AndroidManifest.xml) — Google/Supabase redirect here
  * instead of a web URL once the OAuth flow finishes. */
-const NATIVE_REDIRECT_URL = 'com.staygrid.app://login-callback'
+const NATIVE_REDIRECT_URL = 'com.jeevanam.app://login-callback'
 
 export async function signInWithGoogle(redirectPath = '/dashboard') {
   if (Capacitor.isNativePlatform()) {

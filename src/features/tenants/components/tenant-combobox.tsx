@@ -29,7 +29,7 @@ export function TenantCombobox({ tenants, value, onChange }: TenantComboboxProps
           <span className="flex min-w-0 items-center gap-2">
             <Search className="size-4 shrink-0 text-muted-foreground" />
             <span className="truncate">
-              {selected ? `${selected.name} · Room ${selected.roomNumber}` : 'Search tenant by name, phone, room'}
+              {selected ? `${selected.name} · House ${selected.houseNumber}` : 'Search tenant by name, phone, house'}
             </span>
           </span>
           <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
@@ -44,7 +44,7 @@ export function TenantCombobox({ tenants, value, onChange }: TenantComboboxProps
               {tenants.map((tenant) => (
                 <CommandItem
                   key={tenant.id}
-                  value={`${tenant.name} ${tenant.phone} ${tenant.roomNumber}`}
+                  value={`${tenant.name} ${tenant.phone} ${tenant.houseNumber}`}
                   onSelect={() => {
                     onChange(tenant.id)
                     setOpen(false)
@@ -54,7 +54,7 @@ export function TenantCombobox({ tenants, value, onChange }: TenantComboboxProps
                   <div className="min-w-0">
                     <p className="truncate">{tenant.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      Room {tenant.roomNumber} · {tenant.phone}
+                      House {tenant.houseNumber} · {tenant.phone}
                     </p>
                   </div>
                 </CommandItem>

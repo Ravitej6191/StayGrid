@@ -25,7 +25,7 @@ export function DeleteFloorDialog({ open, onOpenChange, floor, onDeleted }: Dele
     onError: (error: Error) => toast.error(error.message || 'Could not delete the floor. Please try again.'),
   })
 
-  const roomCount = floor?.rooms.length ?? 0
+  const houseCount = floor?.houses.length ?? 0
 
   return (
     <ConfirmSheet
@@ -33,8 +33,8 @@ export function DeleteFloorDialog({ open, onOpenChange, floor, onDeleted }: Dele
       onOpenChange={onOpenChange}
       title={`Delete ${floor?.name}?`}
       description={
-        roomCount > 0
-          ? `This removes ${roomCount} room${roomCount === 1 ? '' : 's'} and all their beds. This can't be undone.`
+        houseCount > 0
+          ? `This removes ${houseCount} house${houseCount === 1 ? '' : 's'}. This can't be undone.`
           : "This can't be undone."
       }
       confirmLabel="Delete"

@@ -25,7 +25,7 @@ export const env = {
   whatsappServerToken: import.meta.env.VITE_WHATSAPP_SERVER_TOKEN as string | undefined,
 }
 
-export const DEMO_MODE_KEY = 'staygrid.demoMode'
+export const DEMO_MODE_KEY = 'jeevanam.demoMode'
 
 /**
  * True whenever THIS session should use the local demo store — either

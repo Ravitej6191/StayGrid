@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Briefcase, ChevronRight, Droplet, IdCard, IndianRupee, Pencil, Phone, Repeat, ShieldCheck, UserX } from 'lucide-react'
+import { Briefcase, ChevronRight, IdCard, IndianRupee, Pencil, Phone, Repeat, ShieldCheck, UserX } from 'lucide-react'
 import { ErrorState } from '@/components/common/error-state'
 import { StatusChip } from '@/components/common/status-chip'
 import { PullToRefresh } from '@/components/common/pull-to-refresh'
@@ -16,7 +16,7 @@ import { useTenant, usePaymentHistory } from '@/features/tenants/hooks/use-tenan
 import { ReassignTenantSheet } from '@/features/tenants/components/reassign-tenant-sheet'
 import { VacateTenantDialog } from '@/features/tenants/components/vacate-tenant-dialog'
 import { PaymentDetailSheet, type HistoryEntry } from '@/features/tenants/components/payment-detail-sheet'
-import { deletePayment } from '@/features/tenants/services/tenants.service'
+import { deleteDeposit, deletePayment } from '@/features/tenants/services/tenants.service'
 import { rentStatusTokens } from '@/constants/status'
 import { formatAadhaar, formatCurrency, formatDate, formatDateTime } from '@/utils/format'
 import { usePageTitle } from '@/hooks/use-page-title'
@@ -34,6 +34,7 @@ export function TenantDetailPage() {
   const [reassignOpen, setReassignOpen] = useState(false)
   const [vacateOpen, setVacateOpen] = useState(false)
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null)
+  const [deleteDepositOpen, setDeleteDepositOpen] = useState(false)
   const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null)
   const onBack = useCallback(() => navigate(-1), [navigate])
   usePageTitle('Tenant Details', onBack)
@@ -50,6 +51,20 @@ export function TenantDetailPage() {
       setSelectedEntry(null)
     },
     onError: () => toast.error('Could not delete the payment. Please try again.'),
+  })
+
+  const deleteDepositMutation = useMutation({
+    mutationFn: () => deleteDeposit(tenant!.id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['tenants'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ])
+      toast.success('Deposit deleted')
+      setDeleteDepositOpen(false)
+      setSelectedEntry(null)
+    },
+    onError: () => toast.error('Could not delete the deposit. Please try again.'),
   })
 
   if (isLoading) {
@@ -113,7 +128,7 @@ export function TenantDetailPage() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-semibold text-foreground">{tenant.name}</p>
               <p className="text-sm text-muted-foreground">
-                {tenant.roomNumber ? `${tenant.floorName} · Room ${tenant.roomNumber}` : 'Not Allotted'}
+                {tenant.houseNumber ? `${tenant.floorName} · House ${tenant.houseNumber}` : 'Not Allotted'}
               </p>
             </div>
             {isActive ? (
@@ -169,22 +184,6 @@ export function TenantDetailPage() {
               <div className="flex items-center gap-2">
                 <Briefcase className="size-3.5 shrink-0" />
                 {tenant.occupation}
-                {tenant.company ? ` · ${tenant.company}` : ''}
-              </div>
-            ) : null}
-            {tenant.emergencyContactName ? (
-              <div className="flex items-center gap-2">
-                <UserX className="size-3.5 shrink-0" />
-                <span className="text-xs text-muted-foreground/70">Emergency</span>
-                <span className="text-foreground">
-                  {tenant.emergencyContactName}
-                  {tenant.emergencyContactPhone ? ` · ${tenant.emergencyContactPhone}` : ''}
-                </span>
-              </div>
-            ) : null}
-            {tenant.bloodGroup ? (
-              <div className="flex items-center gap-2">
-                <Droplet className="size-3.5 shrink-0" /> {tenant.bloodGroup}
               </div>
             ) : null}
             <p className="pt-0.5 text-xs">
@@ -238,6 +237,7 @@ export function TenantDetailPage() {
             setSelectedEntry(null)
             setDeletePaymentId(paymentId)
           }}
+          onDeleteDeposit={() => setDeleteDepositOpen(true)}
         />
 
         <ReassignTenantSheet open={reassignOpen} onOpenChange={setReassignOpen} tenant={tenant} />
@@ -254,6 +254,16 @@ export function TenantDetailPage() {
             if (deletePaymentId) deleteMutation.mutate(deletePaymentId)
           }}
         />
+
+        <ConfirmSheet
+          open={deleteDepositOpen}
+          onOpenChange={setDeleteDepositOpen}
+          title="Delete this deposit?"
+          description="This removes the recorded deposit for this tenant. This can't be undone."
+          confirmLabel="Delete"
+          isPending={deleteDepositMutation.isPending}
+          onConfirm={() => deleteDepositMutation.mutate()}
+        />
       </div>
     </PullToRefresh>
     {isActive ? (
@@ -267,7 +277,7 @@ export function TenantDetailPage() {
         >
           <UserX className="size-4" />
         </Button>
-        <Button variant="outline" size="icon" onClick={() => setReassignOpen(true)} aria-label="Reassign room">
+        <Button variant="outline" size="icon" onClick={() => setReassignOpen(true)} aria-label="Reassign house">
           <Repeat className="size-4" />
         </Button>
         <Button variant="outline" size="icon" onClick={() => navigate(`/tenants/${tenant.id}/edit`)} aria-label="Edit tenant">

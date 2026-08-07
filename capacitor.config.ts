@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.staygrid.app',
-  appName: 'StayGrid',
+  appId: 'com.jeevanam.app',
+  appName: 'Jeevanam',
   webDir: 'dist'
 };
 

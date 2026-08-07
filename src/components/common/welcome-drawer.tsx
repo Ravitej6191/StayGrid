@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/providers/auth-provider'
 import { useBuildingData } from '@/features/building/hooks/use-building-data'
 
-export const WELCOME_SEEN_KEY = 'staygrid.welcomeSeen'
+export const WELCOME_SEEN_KEY = 'jeevanam.welcomeSeen'
 const SEEN_KEY = WELCOME_SEEN_KEY
 
 export function WelcomeDrawer() {
@@ -38,7 +38,7 @@ export function WelcomeDrawer() {
             <PartyPopper className="size-6" />
           </div>
           <SheetTitle className="text-center text-lg">
-            {ownerFirstName ? `Welcome, ${ownerFirstName}!` : 'Welcome to StayGrid'}
+            {ownerFirstName ? `Welcome, ${ownerFirstName}!` : 'Welcome to Jeevanam'}
           </SheetTitle>
         </SheetHeader>
         <div className="space-y-4 px-4 pb-6">
@@ -50,7 +50,7 @@ export function WelcomeDrawer() {
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <Users className="size-4" />
               </span>
-              <span>Add tenants and assign them to rooms from the Building tab</span>
+              <span>Add tenants and assign them to houses from the Building tab</span>
             </li>
             <li className="flex items-start gap-3 text-sm">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">

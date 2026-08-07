@@ -113,7 +113,7 @@ export function WhatsAppIntegrationPage() {
     const url = URL.createObjectURL(dataUrlToBlob(qr.dataUrl))
     const a = document.createElement('a')
     a.href = url
-    a.download = 'staygrid-whatsapp-qr.png'
+    a.download = 'jeevanam-whatsapp-qr.png'
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -122,9 +122,9 @@ export function WhatsAppIntegrationPage() {
     if (!qr) return
     try {
       if (navigator.share && navigator.canShare) {
-        const file = new File([dataUrlToBlob(qr.dataUrl)], 'staygrid-whatsapp-qr.png', { type: 'image/png' })
+        const file = new File([dataUrlToBlob(qr.dataUrl)], 'jeevanam-whatsapp-qr.png', { type: 'image/png' })
         if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'StayGrid WhatsApp QR' })
+          await navigator.share({ files: [file], title: 'Jeevanam WhatsApp QR' })
           return
         }
       }
@@ -173,7 +173,7 @@ export function WhatsAppIntegrationPage() {
         <CardContent className="flex items-start gap-3 text-sm text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0 text-info" />
           <p>
-            If you're using StayGrid on the same phone as WhatsApp, download or share this QR to another device,
+            If you're using Jeevanam on the same phone as WhatsApp, download or share this QR to another device,
             then open WhatsApp → Linked Devices → Link a Device and scan the QR.
           </p>
         </CardContent>

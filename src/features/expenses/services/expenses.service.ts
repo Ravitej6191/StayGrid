@@ -21,7 +21,7 @@ export async function getExpenses(): Promise<Expense[]> {
         amount: e.amount,
         expenseDate: e.expenseDate,
         description: e.description,
-        imageUrl: e.imageUrl,
+        imageUrls: e.imageUrls,
         createdAt: e.createdAt,
       }))
       .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate))
@@ -41,7 +41,7 @@ export async function getExpenses(): Promise<Expense[]> {
 
   const { data, error } = await supabase
     .from('expenses')
-    .select('id, category, amount, expense_date, description, invoice_url, created_at')
+    .select('id, category, amount, expense_date, description, invoice_urls, created_at')
     .eq('building_id', buildingRow.id)
     .order('expense_date', { ascending: false })
   if (error) throw error
@@ -52,7 +52,7 @@ export async function getExpenses(): Promise<Expense[]> {
     amount: e.amount,
     expenseDate: e.expense_date,
     description: e.description,
-    imageUrl: e.invoice_url,
+    imageUrls: e.invoice_urls,
     createdAt: e.created_at,
   }))
 }
@@ -83,7 +83,7 @@ export async function createExpense(input: CreateExpenseInput): Promise<void> {
     amount: input.amount,
     expense_date: input.expenseDate,
     description: input.description,
-    invoice_url: input.imageUrl,
+    invoice_urls: input.imageUrls,
   })
   if (error) throw error
 
@@ -110,7 +110,7 @@ export async function updateExpense(input: EditExpenseInput): Promise<void> {
       amount: input.amount,
       expense_date: input.expenseDate,
       description: input.description,
-      invoice_url: input.imageUrl,
+      invoice_urls: input.imageUrls,
     })
     .eq('id', input.id)
   if (error) throw error

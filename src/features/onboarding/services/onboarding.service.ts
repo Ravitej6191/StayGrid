@@ -39,8 +39,6 @@ async function upsertProfileToSupabase(input: OnboardingInput): Promise<void> {
       state: input.state,
       pincode: input.pincode,
       contact_phone: input.phone,
-      gst_number: input.gstNumber,
-      pan_number: input.panNumber,
     },
     { onConflict: 'owner_id' },
   )
@@ -78,13 +76,11 @@ export async function skipOnboarding(): Promise<void> {
     pincode: '',
     ownerName: '',
     phone: '',
-    gstNumber: null,
-    panNumber: null,
   })
 }
 
 /** Updates building/owner profile fields without touching the existing
- * floors/rooms/tenants — used by the Settings "edit profile" flow. */
+ * floors/houses/tenants — used by the Settings "edit profile" flow. */
 export async function updateProfile(input: OnboardingInput): Promise<void> {
   if (isDemoSession()) {
     updateBuildingProfile({
@@ -95,8 +91,6 @@ export async function updateProfile(input: OnboardingInput): Promise<void> {
       state: input.state,
       pincode: input.pincode,
       contactPhone: input.phone,
-      gstNumber: input.gstNumber,
-      panNumber: input.panNumber,
       ownerName: input.ownerName,
     })
     return
@@ -104,7 +98,7 @@ export async function updateProfile(input: OnboardingInput): Promise<void> {
   await upsertProfileToSupabase(input)
 }
 
-/** Wipes everything the owner has entered since onboarding — floors, rooms,
+/** Wipes everything the owner has entered since onboarding — floors, houses,
  * tenants, payments, expenses, and every other operational record — but
  * keeps the building profile and `onboarding_completed` flag intact, so a
  * Google-authenticated owner isn't sent back through onboarding just to

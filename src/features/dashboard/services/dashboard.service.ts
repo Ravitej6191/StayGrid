@@ -89,12 +89,18 @@ function getDemoData(range: DashboardRange): DashboardData {
   const expensesThisMonth = db.expenses.filter((e) => monthKey(e.expenseDate) === nowKey)
   const monthlyExpense = expensesThisMonth.reduce((sum, e) => sum + e.amount, 0)
 
-  const occupiedBeds = db.beds.filter((b) => b.status === 'occupied').length
-  const totalBeds = db.beds.length
-  const occupancyPercent = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0
-  const vacantCount = totalBeds - occupiedBeds
+  const occupiedCount = db.tenants.filter((t) => t.status === 'active' && t.houseId !== null).length
+  const totalHouses = db.houses.length
+  const occupancyPercent = totalHouses > 0 ? Math.round((occupiedCount / totalHouses) * 100) : 0
+  const vacantCount = totalHouses - occupiedCount
 
   const pendingDepositsCount = activeTenants.filter((t) => !t.depositRecord).length
+
+  const loanPaidByLoan = db.loans.map((l) => db.loanRepayments.filter((r) => r.loanId === l.id).reduce((sum, r) => sum + r.amount, 0))
+  const loanStillToPay = db.loans.map((l, i) => Math.max(0, l.amount - loanPaidByLoan[i]!))
+  const loanOutstanding = loanStillToPay.reduce((sum, v) => sum + v, 0)
+  const loanPaidTillNow = loanPaidByLoan.reduce((sum, v) => sum + v, 0)
+  const activeLoansCount = loanStillToPay.filter((v) => v > 0).length
 
   let trend: IncomeExpenseTrendPoint[]
   if (range === 'all') {
@@ -121,6 +127,9 @@ function getDemoData(range: DashboardRange): DashboardData {
       occupancyPercent,
       vacantCount,
       pendingDepositsCount,
+      loanOutstanding,
+      loanPaidTillNow,
+      activeLoansCount,
     },
     trend,
   }
@@ -153,7 +162,7 @@ async function fetchFromSupabase(range: DashboardRange): Promise<DashboardData> 
   // avoids relying solely on RLS for building isolation).
   const { data: tenantRows, error: tenantsError } = await supabase
     .from('tenants')
-    .select('id, rent, rent_status, status, deposit_paid_amount')
+    .select('id, rent, rent_status, status, deposit_paid_amount, house_id')
     .eq('building_id', buildingRow.id)
   if (tenantsError) throw tenantsError
   const tenantIds = tenantRows.map((t) => t.id)
@@ -161,7 +170,7 @@ async function fetchFromSupabase(range: DashboardRange): Promise<DashboardData> 
   // list is empty, so short-circuit to an empty result instead.
   const noPayments = () => Promise.resolve({ data: [] as never[], error: null })
 
-  const [monthPayments, monthExpenses, bedCountResult, occupiedBedCountResult] = await Promise.all([
+  const [monthPayments, monthExpenses, houseRows, loanRows] = await Promise.all([
     tenantIds.length > 0
       ? supabase.from('payments').select('amount').in('tenant_id', tenantIds).gte('payment_date', startOfMonthIso())
       : noPayments(),
@@ -170,9 +179,27 @@ async function fetchFromSupabase(range: DashboardRange): Promise<DashboardData> 
       .select('amount')
       .eq('building_id', buildingRow.id)
       .gte('expense_date', startOfMonthIso()),
-    supabase.from('beds').select('id', { count: 'exact', head: true }),
-    supabase.from('beds').select('id', { count: 'exact', head: true }).eq('status', 'occupied'),
+    supabase.from('houses').select('id', { count: 'exact', head: true }),
+    supabase.from('loans').select('id, amount').eq('building_id', buildingRow.id),
   ])
+  if (houseRows.error) throw houseRows.error
+  if (loanRows.error) throw loanRows.error
+
+  const loanIds = loanRows.data.map((l) => l.id)
+  const loanRepayments =
+    loanIds.length > 0
+      ? await supabase.from('loan_repayments').select('loan_id, amount').in('loan_id', loanIds)
+      : { data: [] as { loan_id: string; amount: number }[], error: null }
+  if (loanRepayments.error) throw loanRepayments.error
+
+  const paidByLoanId = new Map<string, number>()
+  for (const r of loanRepayments.data ?? []) {
+    paidByLoanId.set(r.loan_id, (paidByLoanId.get(r.loan_id) ?? 0) + r.amount)
+  }
+  const loanStillToPay = loanRows.data.map((l) => Math.max(0, l.amount - (paidByLoanId.get(l.id) ?? 0)))
+  const loanOutstanding = loanStillToPay.reduce((sum, v) => sum + v, 0)
+  const loanPaidTillNow = Array.from(paidByLoanId.values()).reduce((sum, v) => sum + v, 0)
+  const activeLoansCount = loanStillToPay.filter((v) => v > 0).length
 
   const activeTenants = tenantRows.filter((t) => t.status === 'active')
   const pendingRent = activeTenants
@@ -182,9 +209,9 @@ async function fetchFromSupabase(range: DashboardRange): Promise<DashboardData> 
 
   const thisMonthTotal = sum(monthPayments.data)
   const monthlyExpense = sum(monthExpenses.data)
-  const totalBeds = bedCountResult.count ?? 0
-  const occupiedBeds = occupiedBedCountResult.count ?? 0
-  const occupancyPercent = totalBeds ? Math.round((occupiedBeds / totalBeds) * 100) : 0
+  const totalHouses = houseRows.count ?? 0
+  const occupiedCount = activeTenants.filter((t) => t.house_id !== null).length
+  const occupancyPercent = totalHouses ? Math.round((occupiedCount / totalHouses) * 100) : 0
 
   // The window the trend chart needs to fetch data for — a fixed lookback
   // for week/fortnight/month, or "since the earliest record" for all time.
@@ -250,8 +277,11 @@ async function fetchFromSupabase(range: DashboardRange): Promise<DashboardData> 
       pendingRent,
       monthlyExpense,
       occupancyPercent,
-      vacantCount: totalBeds - occupiedBeds,
+      vacantCount: totalHouses - occupiedCount,
       pendingDepositsCount,
+      loanOutstanding,
+      loanPaidTillNow,
+      activeLoansCount,
     },
     trend,
   }

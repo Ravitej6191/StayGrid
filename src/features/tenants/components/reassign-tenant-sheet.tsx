@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { BedDouble, Building2, ChevronLeft, ChevronRight, DoorOpen, Loader2 } from 'lucide-react'
+import { Building2, ChevronLeft, ChevronRight, Home, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { EmptyState } from '@/components/common/empty-state'
 import { useBuildingData } from '@/features/building/hooks/use-building-data'
 import { reassignTenant } from '../services/tenants.service'
-import type { Floor, Room } from '@/features/building/types'
+import type { Floor } from '@/features/building/types'
 import type { Tenant } from '@/types/domain'
 
 interface ReassignTenantSheetProps {
@@ -15,25 +15,23 @@ interface ReassignTenantSheetProps {
   tenant: Tenant | null
 }
 
-type Step = 'floor' | 'room' | 'bed'
+type Step = 'floor' | 'house'
 
 export function ReassignTenantSheet({ open, onOpenChange, tenant }: ReassignTenantSheetProps) {
   const queryClient = useQueryClient()
   const { data: building } = useBuildingData()
   const [step, setStep] = useState<Step>('floor')
   const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null)
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
 
   useEffect(() => {
     if (open) {
       setStep('floor')
       setSelectedFloor(null)
-      setSelectedRoom(null)
     }
   }, [open])
 
   const mutation = useMutation({
-    mutationFn: (bedId: string) => reassignTenant(tenant!.id, bedId),
+    mutationFn: (houseId: string) => reassignTenant(tenant!.id, houseId),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['building'] }),
@@ -50,12 +48,10 @@ export function ReassignTenantSheet({ open, onOpenChange, tenant }: ReassignTena
   if (!tenant) return null
 
   const floors = building?.floors ?? []
-  const floorsWithVacancy = floors.filter((f) => f.rooms.some((r) => r.beds.some((b) => b.status === 'vacant')))
-  const roomsWithVacancy = (selectedFloor?.rooms ?? []).filter((r) => r.beds.some((b) => b.status === 'vacant'))
-  const vacantBeds = (selectedRoom?.beds ?? []).filter((b) => b.status === 'vacant')
+  const floorsWithVacancy = floors.filter((f) => f.houses.some((h) => h.tenant === null))
+  const housesWithVacancy = (selectedFloor?.houses ?? []).filter((h) => h.tenant === null)
 
-  const title =
-    step === 'floor' ? 'Select Floor' : step === 'room' ? 'Select Room' : 'Select Bed'
+  const title = step === 'floor' ? 'Select Floor' : 'Select House'
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -65,7 +61,7 @@ export function ReassignTenantSheet({ open, onOpenChange, tenant }: ReassignTena
             {step !== 'floor' ? (
               <button
                 type="button"
-                onClick={() => setStep(step === 'bed' ? 'room' : 'floor')}
+                onClick={() => setStep('floor')}
                 className="flex size-7 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
               >
                 <ChevronLeft className="size-4" />
@@ -78,12 +74,12 @@ export function ReassignTenantSheet({ open, onOpenChange, tenant }: ReassignTena
         <div className="space-y-2 px-4 pb-8">
           <p className="mb-1 text-xs text-muted-foreground">
             Reassigning {tenant.name} — currently{' '}
-            {tenant.roomNumber ? `${tenant.floorName} · Room ${tenant.roomNumber}` : 'Not Allotted'}
+            {tenant.houseNumber ? `${tenant.floorName} · House ${tenant.houseNumber}` : 'Not Allotted'}
           </p>
 
           {step === 'floor' ? (
             floorsWithVacancy.length === 0 ? (
-              <EmptyState icon={Building2} title="No vacant beds" description="Every room is currently full." />
+              <EmptyState icon={Building2} title="No vacant houses" description="Every house is currently occupied." />
             ) : (
               floorsWithVacancy.map((floor) => (
                 <button
@@ -91,7 +87,7 @@ export function ReassignTenantSheet({ open, onOpenChange, tenant }: ReassignTena
                   type="button"
                   onClick={() => {
                     setSelectedFloor(floor)
-                    setStep('room')
+                    setStep('house')
                   }}
                   className="flex w-full items-center gap-3 rounded-lg border border-border/70 bg-card/60 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent"
                 >
@@ -101,41 +97,18 @@ export function ReassignTenantSheet({ open, onOpenChange, tenant }: ReassignTena
                 </button>
               ))
             )
-          ) : step === 'room' ? (
-            roomsWithVacancy.length === 0 ? (
-              <EmptyState icon={DoorOpen} title="No vacant rooms" description="Pick a different floor." />
-            ) : (
-              roomsWithVacancy.map((room) => (
-                <button
-                  key={room.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedRoom(room)
-                    setStep('bed')
-                  }}
-                  className="flex w-full items-center gap-3 rounded-lg border border-border/70 bg-card/60 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                >
-                  <DoorOpen className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 text-foreground">Room {room.roomNumber}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {room.beds.filter((b) => b.status === 'vacant').length} vacant
-                  </span>
-                  <ChevronRight className="size-4 text-muted-foreground" />
-                </button>
-              ))
-            )
           ) : (
-            vacantBeds.map((bed) => (
+            housesWithVacancy.map((house) => (
               <button
-                key={bed.id}
+                key={house.id}
                 type="button"
                 disabled={mutation.isPending}
-                onClick={() => mutation.mutate(bed.id)}
+                onClick={() => mutation.mutate(house.id)}
                 className="flex w-full items-center gap-3 rounded-lg border border-border/70 bg-card/60 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent disabled:opacity-60"
               >
-                <BedDouble className="size-4 shrink-0 text-muted-foreground" />
-                <span className="flex-1 text-foreground">Bed {bed.bedLabel}</span>
-                {mutation.isPending && mutation.variables === bed.id ? (
+                <Home className="size-4 shrink-0 text-muted-foreground" />
+                <span className="flex-1 text-foreground">House {house.houseNumber}</span>
+                {mutation.isPending && mutation.variables === house.id ? (
                   <Loader2 className="size-4 shrink-0 animate-spin" />
                 ) : null}
               </button>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, type NavigateFunction } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { AlertTriangle, Banknote, BedDouble, Building2, ChevronRight, DoorOpen, IndianRupee, ShieldAlert, UserPlus } from 'lucide-react'
+import { AlertTriangle, Banknote, Building2, ChevronRight, HandCoins, IndianRupee, Landmark, UserPlus } from 'lucide-react'
 import { ChartCard } from '@/components/common/chart-card'
 import { ErrorState } from '@/components/common/error-state'
 import { PullToRefresh } from '@/components/common/pull-to-refresh'
@@ -26,7 +26,7 @@ const rangeOptions: { value: DashboardRange; label: string }[] = [
 ]
 
 export function DashboardPage() {
-  usePageTitle('StayGrid')
+  usePageTitle('Jeevanam')
   const navigate = useNavigate()
   const [range, setRange] = useState<DashboardRange>('all')
   const { data, isLoading, isError, refetch } = useDashboardData(range)
@@ -48,7 +48,7 @@ export function DashboardPage() {
 
         <QuickActions
           onRecordPayment={() => navigate('/tenants/record-payment')}
-          onAddTenant={() => navigate('/tenants/new')}
+          onRecordLoan={() => navigate('/loans/record-repayment')}
           onAddExpense={() => navigate('/expenses/new')}
           onBroadcast={() => navigate('/broadcast')}
         />
@@ -71,11 +71,29 @@ export function DashboardPage() {
                 { icon: IndianRupee, label: 'Income This Month', value: formatCurrency(data.stats.incomeThisMonth), tone: 'primary' as const },
                 { icon: Banknote, label: 'Expense This Month', value: formatCurrency(data.stats.monthlyExpense), tone: 'warning' as const },
                 { icon: AlertTriangle, label: 'Pending Rents', value: formatCurrency(data.stats.pendingRent), tone: 'danger' as const },
-                { icon: DoorOpen, label: 'Occupancy', value: `${data.stats.occupancyPercent}%`, tone: 'info' as const },
-                { icon: BedDouble, label: 'Vacant Beds', value: String(data.stats.vacantCount), tone: 'neutral' as const },
-                { icon: ShieldAlert, label: 'Pending Deposits', value: String(data.stats.pendingDepositsCount), tone: 'danger' as const },
               ].map((stat) => (
                 <motion.div key={stat.label} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+                  <StatCard icon={stat.icon} label={stat.label} value={stat.value} tone={stat.tone} />
+                </motion.div>
+              ))}
+            </motion.div>
+
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+              className="grid grid-cols-2 gap-2.5"
+            >
+              {[
+                { icon: HandCoins, label: 'Loan Paid Till Now', value: formatCurrency(data.stats.loanPaidTillNow), tone: 'info' as const },
+                { icon: Landmark, label: 'Outstanding (All Loans)', value: formatCurrency(data.stats.loanOutstanding), tone: 'danger' as const },
+              ].map((stat) => (
+                <motion.div
+                  key={stat.label}
+                  variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+                  onClick={() => navigate('/loans')}
+                  className="cursor-pointer"
+                >
                   <StatCard icon={stat.icon} label={stat.label} value={stat.value} tone={stat.tone} />
                 </motion.div>
               ))}
@@ -117,7 +135,7 @@ function SetupChecklist({ navigate }: { navigate: NavigateFunction }) {
   const steps = [
     {
       icon: Building2,
-      label: 'Add a floor and your first room',
+      label: 'Add a floor and your first house',
       description: 'Set up where your tenants will stay.',
       onClick: () => navigate('/building'),
     },
@@ -167,7 +185,12 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-2.5">
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        {Array.from({ length: 2 }).map((_, i) => (
           <Skeleton key={i} className="h-24 rounded-xl" />
         ))}
       </div>

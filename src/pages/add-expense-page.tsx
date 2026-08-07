@@ -46,6 +46,14 @@ const expenseSchema = z
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>
 
+/** A receipt photo either already saved (`url` only) or newly picked and
+ * waiting to be uploaded on submit (`file` + a local object URL preview). */
+interface PhotoItem {
+  key: string
+  url: string
+  file?: File
+}
+
 export function AddExpensePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -56,34 +64,35 @@ export function AddExpensePage() {
   usePageTitle(isEditing ? 'Edit Expense' : 'Add Expense', onBack)
 
   const queryClient = useQueryClient()
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [photos, setPhotos] = useState<PhotoItem[]>([])
+  const [isUploadingImages, setIsUploadingImages] = useState(false)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const objectUrlRef = useRef<string | null>(null)
+  const objectUrlsRef = useRef<Set<string>>(new Set())
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+  const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
     e.target.value = ''
-    if (!file) return
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
-    const objectUrl = URL.createObjectURL(file)
-    objectUrlRef.current = objectUrl
-    setImageFile(file)
-    setImagePreview(objectUrl)
+    if (files.length === 0) return
+    const newPhotos: PhotoItem[] = files.map((file) => {
+      const objectUrl = URL.createObjectURL(file)
+      objectUrlsRef.current.add(objectUrl)
+      return { key: objectUrl, url: objectUrl, file }
+    })
+    setPhotos((current) => [...current, ...newPhotos])
   }
 
-  const handleRemoveImage = () => {
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
-    objectUrlRef.current = null
-    setImageFile(null)
-    setImagePreview(null)
+  const handleRemovePhoto = (key: string) => {
+    setPhotos((current) => current.filter((p) => p.key !== key))
+    if (objectUrlsRef.current.has(key)) {
+      URL.revokeObjectURL(key)
+      objectUrlsRef.current.delete(key)
+    }
   }
 
   useEffect(() => {
     return () => {
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+      for (const url of objectUrlsRef.current) URL.revokeObjectURL(url)
     }
   }, [])
 
@@ -106,9 +115,8 @@ export function AddExpensePage() {
 
   useEffect(() => {
     if (isEditing && !existingExpense) return
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
-    objectUrlRef.current = null
-    setImageFile(null)
+    for (const url of objectUrlsRef.current) URL.revokeObjectURL(url)
+    objectUrlsRef.current.clear()
     if (existingExpense) {
       reset({
         category: existingExpense.category,
@@ -116,10 +124,10 @@ export function AddExpensePage() {
         expenseDate: existingExpense.expenseDate,
         description: existingExpense.description ?? '',
       })
-      setImagePreview(existingExpense.imageUrl)
+      setPhotos(existingExpense.imageUrls.map((url) => ({ key: url, url })))
     } else {
       reset({ category: 'groceries', amount: 0, expenseDate: todayIso(), description: '' })
-      setImagePreview(null)
+      setPhotos([])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingExpense, isEditing, reset])
@@ -153,20 +161,24 @@ export function AddExpensePage() {
     onError: () => toast.error('Could not update expense. Please try again.'),
   })
 
-  const isPending = createMutation.isPending || updateMutation.isPending || isUploadingImage
+  const isPending = createMutation.isPending || updateMutation.isPending || isUploadingImages
 
   const onSubmit = async (values: ExpenseFormValues) => {
-    let imageUrl = imageFile ? null : imagePreview
-    if (imageFile) {
-      setIsUploadingImage(true)
+    let imageUrls: string[]
+    if (photos.some((p) => p.file)) {
+      setIsUploadingImages(true)
       try {
-        imageUrl = await uploadTenantFile(imageFile, 'expense-receipts')
+        imageUrls = await Promise.all(
+          photos.map((p) => (p.file ? uploadTenantFile(p.file, 'expense-receipts') : Promise.resolve(p.url))),
+        )
       } catch {
-        toast.error('Could not upload the image. Please try again.')
-        setIsUploadingImage(false)
+        toast.error('Could not upload the photos. Please try again.')
+        setIsUploadingImages(false)
         return
       }
-      setIsUploadingImage(false)
+      setIsUploadingImages(false)
+    } else {
+      imageUrls = photos.map((p) => p.url)
     }
 
     const shared = {
@@ -174,7 +186,7 @@ export function AddExpensePage() {
       amount: values.amount,
       expenseDate: values.expenseDate,
       description: values.description || null,
-      imageUrl,
+      imageUrls,
     }
     if (existingExpense) {
       updateMutation.mutate({ id: existingExpense.id, ...shared })
@@ -250,41 +262,46 @@ export function AddExpensePage() {
       </div>
 
       <div className="space-y-1.5">
-        <Label>Receipt photo (optional)</Label>
-        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-        {imagePreview ? (
-          <div className="relative w-fit">
-            <img src={imagePreview} alt="Expense receipt" className="h-32 rounded-lg border border-border object-cover" />
-            <button
-              type="button"
-              onClick={handleRemoveImage}
-              aria-label="Remove photo"
-              className="absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full bg-danger text-danger-foreground shadow-sm"
-            >
-              <X className="size-3.5" />
-            </button>
+        <Label>Receipt photos (optional)</Label>
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImagesChange} />
+        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImagesChange} />
+
+        {photos.length > 0 ? (
+          <div className="grid grid-cols-3 gap-2">
+            {photos.map((photo) => (
+              <div key={photo.key} className="relative">
+                <img src={photo.url} alt="Expense receipt" className="aspect-square w-full rounded-lg border border-border object-cover" />
+                <button
+                  type="button"
+                  onClick={() => handleRemovePhoto(photo.key)}
+                  aria-label="Remove photo"
+                  className="absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full bg-danger text-danger-foreground shadow-sm"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ))}
           </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border py-4 text-sm text-muted-foreground transition-colors hover:bg-accent/50"
-            >
-              <Camera className="size-4" />
-              Take Photo
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border py-4 text-sm text-muted-foreground transition-colors hover:bg-accent/50"
-            >
-              <ImagePlus className="size-4" />
-              Upload Image
-            </button>
-          </div>
-        )}
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border py-4 text-sm text-muted-foreground transition-colors hover:bg-accent/50"
+          >
+            <Camera className="size-4" />
+            Take Photo
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border py-4 text-sm text-muted-foreground transition-colors hover:bg-accent/50"
+          >
+            <ImagePlus className="size-4" />
+            Upload Images
+          </button>
+        </div>
       </div>
 
       <Button type="submit" className="w-full" disabled={isPending}>

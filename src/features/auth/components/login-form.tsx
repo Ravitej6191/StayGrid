@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Building2, Loader2, Sparkles } from 'lucide-react'
+import { Building2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -68,7 +68,7 @@ export function LoginForm() {
           transition={{ delay: 0.35, duration: 0.4, ease: 'easeOut' }}
           className="mt-4 text-2xl font-semibold tracking-tight text-foreground"
         >
-          StayGrid
+          Jeevanam
         </motion.p>
         <motion.p
           initial={{ opacity: 0, y: 8 }}
@@ -100,15 +100,14 @@ export function LoginForm() {
             </div>
 
             <Button variant="secondary" className="w-full" onClick={continueInDemoMode}>
-              <Sparkles className="size-4" />
-              Continue in Demo Mode
+              Skip
             </Button>
           </motion.div>
         ) : null}
       </motion.div>
 
       <p className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] text-center text-xs text-muted-foreground/60">
-        StayGrid v{APP_VERSION}
+        Jeevanam v{APP_VERSION}
       </p>
     </>
   )

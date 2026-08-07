@@ -32,9 +32,10 @@ interface PaymentDetailSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onDelete: (paymentId: string) => void
+  onDeleteDeposit: () => void
 }
 
-export function PaymentDetailSheet({ entry, open, onOpenChange, onDelete }: PaymentDetailSheetProps) {
+export function PaymentDetailSheet({ entry, open, onOpenChange, onDelete, onDeleteDeposit }: PaymentDetailSheetProps) {
   if (!entry) return null
 
   return (
@@ -97,7 +98,7 @@ export function PaymentDetailSheet({ entry, open, onOpenChange, onDelete }: Paym
               <p className="mb-1.5 text-xs text-muted-foreground">Attached photo</p>
               <img
                 src={entry.receiptUrl}
-                alt="Payment receipt"
+                alt="Payment photo"
                 className="max-h-72 w-full rounded-lg border border-border/70 object-cover"
               />
             </div>
@@ -112,7 +113,12 @@ export function PaymentDetailSheet({ entry, open, onOpenChange, onDelete }: Paym
               <Trash2 className="size-4" />
               Delete Payment
             </Button>
-          ) : null}
+          ) : (
+            <Button variant="outline" className="w-full text-danger hover:text-danger" onClick={onDeleteDeposit}>
+              <Trash2 className="size-4" />
+              Delete Deposit
+            </Button>
+          )}
         </div>
       </SheetContent>
     </Sheet>

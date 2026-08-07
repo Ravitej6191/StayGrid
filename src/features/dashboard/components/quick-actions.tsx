@@ -1,4 +1,4 @@
-import { IndianRupee, Megaphone, UserPlus, Wallet } from 'lucide-react'
+import { HandCoins, IndianRupee, Megaphone, Wallet } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 interface QuickAction {
@@ -9,15 +9,15 @@ interface QuickAction {
 
 interface QuickActionsProps {
   onRecordPayment: () => void
-  onAddTenant: () => void
+  onRecordLoan: () => void
   onAddExpense: () => void
   onBroadcast: () => void
 }
 
-export function QuickActions({ onRecordPayment, onAddTenant, onAddExpense, onBroadcast }: QuickActionsProps) {
+export function QuickActions({ onRecordPayment, onRecordLoan, onAddExpense, onBroadcast }: QuickActionsProps) {
   const actions: QuickAction[] = [
     { icon: IndianRupee, label: 'Record Payment', onClick: onRecordPayment },
-    { icon: UserPlus, label: 'Add Tenant', onClick: onAddTenant },
+    { icon: HandCoins, label: 'Record Loan', onClick: onRecordLoan },
     { icon: Wallet, label: 'Add Expense', onClick: onAddExpense },
     { icon: Megaphone, label: 'Broadcast', onClick: onBroadcast },
   ]

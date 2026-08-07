@@ -11,7 +11,5 @@ export interface OnboardingInput {
   pincode: string
   ownerName: string
   phone: string
-  gstNumber: string | null
-  panNumber: string | null
 }
 

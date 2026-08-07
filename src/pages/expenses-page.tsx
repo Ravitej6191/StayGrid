@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmSheet } from '@/components/common/confirm-sheet'
 import { useExpenses } from '@/features/expenses/hooks/use-expenses'
 import { ExpenseListItem } from '@/features/expenses/components/expense-list-item'
+import { ExpenseDetailSheet } from '@/features/expenses/components/expense-detail-sheet'
 import { deleteExpense } from '@/features/expenses/services/expenses.service'
 import { expenseCategoryOptions, type Expense } from '@/features/expenses/types'
 import { formatCurrency } from '@/utils/format'
@@ -28,6 +29,7 @@ export function ExpensesPage() {
   const queryClient = useQueryClient()
   const { data: expenses, isLoading, isError, refetch } = useExpenses()
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null)
+  const [viewingExpense, setViewingExpense] = useState<Expense | null>(null)
   const [search, setSearch] = useState('')
 
   const filteredExpenses = useMemo(() => {
@@ -106,12 +108,7 @@ export function ExpensesPage() {
                     <p className="text-xs font-medium text-muted-foreground">{formatCurrency(group.total)}</p>
                   </div>
                   {group.items.map((expense) => (
-                    <ExpenseListItem
-                      key={expense.id}
-                      expense={expense}
-                      onEdit={() => navigate(`/expenses/${expense.id}/edit`)}
-                      onDelete={() => setDeletingExpense(expense)}
-                    />
+                    <ExpenseListItem key={expense.id} expense={expense} onSelect={() => setViewingExpense(expense)} />
                   ))}
                 </div>
               ))}
@@ -127,6 +124,20 @@ export function ExpensesPage() {
             isPending={deleteMutation.isPending}
             onConfirm={() => {
               if (deletingExpense) deleteMutation.mutate(deletingExpense.id)
+            }}
+          />
+
+          <ExpenseDetailSheet
+            expense={viewingExpense}
+            open={viewingExpense !== null}
+            onOpenChange={(open) => !open && setViewingExpense(null)}
+            onEdit={() => {
+              if (viewingExpense) navigate(`/expenses/${viewingExpense.id}/edit`)
+              setViewingExpense(null)
+            }}
+            onDelete={() => {
+              setDeletingExpense(viewingExpense)
+              setViewingExpense(null)
             }}
           />
         </div>

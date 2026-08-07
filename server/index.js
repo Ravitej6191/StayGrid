@@ -60,7 +60,7 @@ async function startSocket() {
       auth: authState,
       logger,
       printQRInTerminal: false,
-      browser: ['StayGrid', 'Chrome', '1.0.0'],
+      browser: ['Jeevanam', 'Chrome', '1.0.0'],
     })
 
     sock.ev.on('creds.update', saveCreds)
@@ -247,7 +247,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
 })
 
 app.listen(PORT, () => {
-  console.log(`StayGrid WhatsApp server listening on http://localhost:${PORT}`)
+  console.log(`Jeevanam WhatsApp server listening on http://localhost:${PORT}`)
   // Resume an existing session on boot if one was persisted.
   if (fs.existsSync(AUTH_DIR) && fs.readdirSync(AUTH_DIR).length > 0) {
     state.status = 'connecting'

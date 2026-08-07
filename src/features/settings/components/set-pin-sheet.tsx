@@ -54,7 +54,7 @@ export function SetPinSheet({ open, onOpenChange }: SetPinSheetProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4 px-4 pb-8">
           <p className="text-sm text-muted-foreground">
-            Choose a 4-digit PIN. You'll need it to open StayGrid after the app is backgrounded or restarted.
+            Choose a 4-digit PIN. You'll need it to open Jeevanam after the app is backgrounded or restarted.
           </p>
 
           <div className="space-y-1.5">

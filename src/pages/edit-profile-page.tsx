@@ -20,8 +20,6 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { digitsOnly } from '@/utils/format'
 import type { PropertyType } from '@/types/database.types'
 
-const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
-const PAN_REGEX = /^[A-Z]{5}\d{4}[A-Z]$/
 const PHONE_REGEX = /^[6-9]\d{9}$/
 const PINCODE_REGEX = /^\d{6}$/
 
@@ -33,8 +31,6 @@ const profileSchema = z.object({
   pincode: z.string().regex(PINCODE_REGEX, 'Enter a valid 6-digit pincode'),
   ownerName: z.string().min(2, 'Enter your name').max(80, 'Name is too long'),
   phone: z.string().regex(PHONE_REGEX, 'Enter a valid 10-digit mobile number'),
-  gstNumber: z.string().refine((v) => !v || GST_REGEX.test(v), 'Enter a valid GSTIN'),
-  panNumber: z.string().refine((v) => !v || PAN_REGEX.test(v), 'Enter a valid PAN'),
 })
 
 type ProfileFormValues = z.infer<typeof profileSchema>
@@ -65,8 +61,6 @@ export function EditProfilePage() {
       pincode={data.building.pincode}
       ownerName={data.building.ownerName || user?.name || ''}
       phone={data.building.contactPhone}
-      gstNumber={data.building.gstNumber ?? ''}
-      panNumber={data.building.panNumber ?? ''}
     />
   )
 }
@@ -80,8 +74,6 @@ interface EditProfileFormProps {
   pincode: string
   ownerName: string
   phone: string
-  gstNumber: string
-  panNumber: string
 }
 
 function EditProfileForm({ propertyType, ...defaultValues }: EditProfileFormProps) {
@@ -110,8 +102,6 @@ function EditProfileForm({ propertyType, ...defaultValues }: EditProfileFormProp
       await updateProfile({
         ...values,
         propertyType,
-        gstNumber: values.gstNumber || null,
-        panNumber: values.panNumber || null,
       })
       await queryClient.invalidateQueries({ queryKey: ['building'] })
       toast.success('Profile updated')
@@ -213,29 +203,6 @@ function EditProfileForm({ propertyType, ...defaultValues }: EditProfileFormProp
           {...register('phone', { onChange: (e) => { e.target.value = digitsOnly(e.target.value, 10) } })}
         />
         {errors.phone ? <p className="text-xs text-danger">{errors.phone.message}</p> : null}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="gstNumber">GST (optional)</Label>
-          <Input
-            id="gstNumber"
-            className="uppercase"
-            maxLength={15}
-            {...register('gstNumber', { onChange: (e) => { e.target.value = e.target.value.toUpperCase().slice(0, 15) } })}
-          />
-          {errors.gstNumber ? <p className="text-xs text-danger">{errors.gstNumber.message}</p> : null}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="panNumber">PAN (optional)</Label>
-          <Input
-            id="panNumber"
-            className="uppercase"
-            maxLength={10}
-            {...register('panNumber', { onChange: (e) => { e.target.value = e.target.value.toUpperCase().slice(0, 10) } })}
-          />
-          {errors.panNumber ? <p className="text-xs text-danger">{errors.panNumber.message}</p> : null}
-        </div>
       </div>
 
       <Button type="submit" className="w-full" disabled={isSaving}>

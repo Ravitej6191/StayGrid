@@ -1,4 +1,4 @@
-import { Building2, LayoutDashboard, Settings, Users, Wallet } from 'lucide-react'
+import { Building2, HandCoins, LayoutDashboard, Settings, Wallet } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -10,7 +10,7 @@ export interface NavItem {
 export const bottomNavItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/building', label: 'Building', icon: Building2 },
-  { to: '/tenants', label: 'Tenants', icon: Users },
+  { to: '/loans', label: 'Loans', icon: HandCoins },
   { to: '/expenses', label: 'Expenses', icon: Wallet },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]

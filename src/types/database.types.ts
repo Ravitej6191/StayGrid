@@ -6,17 +6,7 @@
  */
 
 export type PropertyType = 'pg' | 'co_living' | 'building' | 'residency' | 'apartment'
-export type RoomType =
-  | 'single'
-  | 'twin'
-  | 'sharing_3'
-  | 'sharing_4'
-  | 'sharing_5'
-  | 'sharing_6'
-  | 'sharing_7'
-  | 'sharing_8'
-  | 'dorm'
-export type BedStatus = 'vacant' | 'occupied' | 'maintenance'
+export type HouseType = '1bhk' | '2bhk' | '3bhk'
 export type TenantStatus = 'active' | 'vacated'
 export type RentStatus = 'paid' | 'partial' | 'pending' | 'advance'
 export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque'
@@ -33,6 +23,7 @@ export type ExpenseCategory =
   | 'furniture'
   | 'salary'
   | 'misc'
+export type LenderType = 'bank' | 'society' | 'dwakara' | 'hand_cash' | 'gold_loan' | 'other'
 export type InventoryCategory =
   | 'kitchen'
   | 'furniture'
@@ -57,8 +48,6 @@ export type BuildingRow = {
   pincode: string | null
   contact_phone: string | null
   contact_email: string | null
-  gst_number: string | null
-  pan_number: string | null
   created_at: string
   updated_at: string
 }
@@ -71,39 +60,27 @@ export type FloorRow = {
   created_at: string
 }
 
-export type RoomRow = {
+export type HouseRow = {
   id: string
   floor_id: string
-  room_number: string
-  room_type: RoomType
-  capacity: number
+  house_number: string
+  house_type: HouseType
+  gas_connection_number: string | null
+  electricity_bill_number: string | null
   notes: string | null
   created_at: string
   updated_at: string
 }
 
-export type BedRow = {
-  id: string
-  room_id: string
-  bed_label: string
-  status: BedStatus
-  created_at: string
-}
-
 export type TenantRow = {
   id: string
   building_id: string
-  bed_id: string | null
+  house_id: string | null
   name: string
   phone: string
-  email: string | null
   aadhaar_number: string | null
-  emergency_contact_name: string | null
-  emergency_contact_phone: string | null
   address: string | null
   occupation: string | null
-  company: string | null
-  blood_group: string | null
   photo_url: string | null
   joining_date: string
   vacating_date: string | null
@@ -137,6 +114,29 @@ export type PaymentRow = {
   created_at: string
 }
 
+export type LoanRow = {
+  id: string
+  building_id: string
+  lender_type: LenderType
+  lender_name: string | null
+  amount: number
+  interest_note: string | null
+  taken_on: string
+  taken_till: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type LoanRepaymentRow = {
+  id: string
+  loan_id: string
+  amount: number
+  payment_date: string
+  notes: string | null
+  created_at: string
+}
+
 export type ExpenseRow = {
   id: string
   building_id: string
@@ -144,7 +144,7 @@ export type ExpenseRow = {
   amount: number
   expense_date: string
   description: string | null
-  invoice_url: string | null
+  invoice_urls: string[]
   created_at: string
 }
 
@@ -226,10 +226,11 @@ export type Database = {
     Tables: {
       building: TableDef<BuildingRow>
       floors: TableDef<FloorRow>
-      rooms: TableDef<RoomRow>
-      beds: TableDef<BedRow>
+      houses: TableDef<HouseRow>
       tenants: TableDef<TenantRow>
       payments: TableDef<PaymentRow>
+      loans: TableDef<LoanRow>
+      loan_repayments: TableDef<LoanRepaymentRow>
       expenses: TableDef<ExpenseRow>
       inventory: TableDef<InventoryRow>
       documents: TableDef<DocumentRow>

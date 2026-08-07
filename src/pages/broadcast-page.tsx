@@ -72,10 +72,8 @@ export function BroadcastPage() {
   const allTenants = useMemo(() => {
     const list: (Tenant & { floorId: string })[] = []
     for (const floor of building?.floors ?? []) {
-      for (const room of floor.rooms) {
-        for (const bed of room.beds) {
-          if (bed.tenant) list.push({ ...bed.tenant, floorId: floor.id })
-        }
+      for (const house of floor.houses) {
+        if (house.tenant) list.push({ ...house.tenant, floorId: floor.id })
       }
     }
     return list
@@ -88,10 +86,10 @@ export function BroadcastPage() {
       { value: 'pending_deposit', label: 'Pending Deposit' },
     ]
     const floors = (building?.floors ?? []).map((f) => ({ value: `floor:${f.id}`, label: f.name }))
-    const rooms = (building?.floors ?? []).flatMap((f) =>
-      f.rooms.map((r) => ({ value: `room:${r.id}`, label: `${f.name} · Room ${r.roomNumber}` })),
+    const houses = (building?.floors ?? []).flatMap((f) =>
+      f.houses.map((h) => ({ value: `house:${h.id}`, label: `${f.name} · House ${h.houseNumber}` })),
     )
-    return { general, floors, rooms }
+    return { general, floors, houses }
   }, [building])
 
   const {
@@ -129,13 +127,13 @@ export function BroadcastPage() {
         label: floor?.name ?? 'Floor',
       }
     }
-    if (audience.startsWith('room:')) {
-      const roomId = audience.slice('room:'.length)
+    if (audience.startsWith('house:')) {
+      const houseId = audience.slice('house:'.length)
       return {
-        phones: allTenants.filter((t) => t.roomId === roomId).map((t) => t.phone),
-        label: allTenants.find((t) => t.roomId === roomId)
-          ? `Room ${allTenants.find((t) => t.roomId === roomId)?.roomNumber}`
-          : 'Room',
+        phones: allTenants.filter((t) => t.houseId === houseId).map((t) => t.phone),
+        label: allTenants.find((t) => t.houseId === houseId)
+          ? `House ${allTenants.find((t) => t.houseId === houseId)?.houseNumber}`
+          : 'House',
       }
     }
     return { phones: [], label: 'Unknown' }
@@ -206,10 +204,10 @@ export function BroadcastPage() {
                     ))}
                   </SelectGroup>
                 ) : null}
-                {audienceGroups.rooms.length > 0 ? (
+                {audienceGroups.houses.length > 0 ? (
                   <SelectGroup>
-                    <SelectLabel>By Room</SelectLabel>
-                    {audienceGroups.rooms.map((option) => (
+                    <SelectLabel>By House</SelectLabel>
+                    {audienceGroups.houses.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>

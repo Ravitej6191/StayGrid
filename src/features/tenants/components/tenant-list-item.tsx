@@ -26,7 +26,7 @@ export function TenantListItem({ tenant }: { tenant: Tenant }) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">{tenant.name}</p>
         <p className="text-xs text-muted-foreground">
-          {tenant.roomNumber ? `${tenant.floorName} · Room ${tenant.roomNumber}` : 'Not yet allocated'}
+          {tenant.houseNumber ? `${tenant.floorName} · House ${tenant.houseNumber}` : 'Not yet allocated'}
         </p>
       </div>
       <div className="text-right">

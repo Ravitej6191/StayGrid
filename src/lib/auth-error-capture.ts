@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'staygrid.authError'
+const STORAGE_KEY = 'jeevanam.authError'
 
 /**
  * Supabase reports OAuth failures (e.g. a bad Google client secret) by

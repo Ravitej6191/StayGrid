@@ -1,12 +1,11 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTheme } from 'next-themes'
 import {
-  Bell,
   Building2,
+  Check,
   ChevronRight,
-  Globe,
   Lock,
   LogOut,
   Moon,
@@ -26,39 +25,38 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ConfirmSheet } from '@/components/common/confirm-sheet'
+import { PullToRefresh } from '@/components/common/pull-to-refresh'
 import { SetPinSheet } from '@/features/settings/components/set-pin-sheet'
 import { useBuildingData } from '@/features/building/hooks/use-building-data'
 import { clearAccountData, clearAppData } from '@/features/onboarding/services/onboarding.service'
 import { applyThemeColor, getStoredThemeColor, themeColorPresets } from '@/constants/theme-colors'
-import { NOTIFICATIONS_ENABLED_KEY, areNotificationsEnabled } from '@/lib/notification-prefs'
-import { APP_VERSION } from '@/constants/app'
+import { isBiometricAvailable, registerBiometricCredential } from '@/lib/biometric-auth'
 import { useAuth } from '@/providers/auth-provider'
 import { useAppLockStore } from '@/store/app-lock-store'
 import { usePageTitle } from '@/hooks/use-page-title'
-
-const languageOptions = [
-  { value: 'en', label: 'English', comingSoon: false },
-  { value: 'hi', label: 'Hindi', comingSoon: true },
-  { value: 'te', label: 'Telugu', comingSoon: true },
-  { value: 'ta', label: 'Tamil', comingSoon: true },
-]
 
 export function SettingsPage() {
   const navigate = useNavigate()
   usePageTitle('Settings', () => navigate(-1))
   const queryClient = useQueryClient()
-  const { theme, setTheme } = useTheme()
-  const { data } = useBuildingData()
+  const { resolvedTheme, setTheme } = useTheme()
+  const { data, refetch } = useBuildingData()
   const { user, isDemoMode, logout } = useAuth()
   const [clearDataOpen, setClearDataOpen] = useState(false)
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => areNotificationsEnabled())
   const appLockEnabled = useAppLockStore((s) => s.enabled)
+  const biometricEnabled = useAppLockStore((s) => s.biometricEnabled)
   const disableAppLock = useAppLockStore((s) => s.disable)
+  const setBiometricEnabled = useAppLockStore((s) => s.setBiometricEnabled)
   const [setPinOpen, setSetPinOpen] = useState(false)
   const [disableLockOpen, setDisableLockOpen] = useState(false)
   const [themeColor, setThemeColor] = useState(() => getStoredThemeColor())
-  const [language, setLanguage] = useState('en')
+  const [biometricSupported, setBiometricSupported] = useState(false)
+  const [isRegisteringBiometric, setIsRegisteringBiometric] = useState(false)
+
+  useEffect(() => {
+    void isBiometricAvailable().then(setBiometricSupported)
+  }, [])
 
   const clearDataMutation = useMutation({
     mutationFn: clearAppData,
@@ -78,8 +76,25 @@ export function SettingsPage() {
     onError: () => toast.error('Could not delete your account. Please try again.'),
   })
 
+  const handleBiometricToggle = async (checked: boolean) => {
+    if (!checked) {
+      setBiometricEnabled(false)
+      return
+    }
+    setIsRegisteringBiometric(true)
+    const credentialId = await registerBiometricCredential(user?.id ?? 'owner')
+    setIsRegisteringBiometric(false)
+    if (credentialId) {
+      setBiometricEnabled(true, credentialId)
+      toast.success('Biometric unlock enabled')
+    } else {
+      toast.error('Could not set up biometric unlock. Please try again.')
+    }
+  }
+
   return (
-    <div className="space-y-5">
+    <PullToRefresh onRefresh={refetch}>
+      <div className="space-y-5">
       <Card className="border-border">
         <CardContent className="space-y-4">
           {data ? (
@@ -123,14 +138,6 @@ export function SettingsPage() {
                     {data.building.pincode ? ` - ${data.building.pincode}` : ''}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">GST</p>
-                  <p className="truncate font-medium text-foreground">{data.building.gstNumber || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">PAN</p>
-                  <p className="truncate font-medium text-foreground">{data.building.panNumber || '—'}</p>
-                </div>
               </div>
             </>
           ) : (
@@ -146,10 +153,10 @@ export function SettingsPage() {
           <div className="-my-1 divide-y divide-border">
             <div className="flex w-full items-center gap-2.5 py-3">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                {theme === 'dark' ? <Moon className="size-4" /> : <Sun className="size-4" />}
+                {resolvedTheme === 'dark' ? <Moon className="size-4" /> : <Sun className="size-4" />}
               </span>
               <span className="flex-1 text-sm font-medium text-foreground">Appearance</span>
-              <Select value={theme} onValueChange={setTheme}>
+              <Select value={resolvedTheme ?? 'light'} onValueChange={setTheme}>
                 <SelectTrigger size="sm" className="w-[110px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -171,62 +178,28 @@ export function SettingsPage() {
                 <Palette className="size-4" />
               </span>
               <span className="flex-1 text-sm font-medium text-foreground">Theme Color</span>
-              <Select
-                value={themeColor}
-                onValueChange={(value) => {
-                  applyThemeColor(value)
-                  setThemeColor(value)
-                }}
-              >
-                <SelectTrigger size="sm" className="w-[130px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  {themeColorPresets.map((preset) => (
-                    <SelectItem key={preset.id} value={preset.id}>
-                      <span
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: preset.swatch } as CSSProperties}
-                      />
-                      {preset.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex w-full items-center gap-2.5 py-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Bell className="size-4" />
-              </span>
-              <span className="flex-1 text-sm font-medium text-foreground">Notifications</span>
-              <Switch
-                checked={notificationsEnabled}
-                onCheckedChange={(checked) => {
-                  setNotificationsEnabled(checked)
-                  localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(checked))
-                }}
-              />
-            </div>
-
-            <div className="flex w-full items-center gap-2.5 py-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Globe className="size-4" />
-              </span>
-              <span className="flex-1 text-sm font-medium text-foreground">Language</span>
-              <Select value={language} onValueChange={setLanguage}>
-                <SelectTrigger size="sm" className="w-[130px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  {languageOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value} disabled={option.comingSoon}>
-                      {option.label}
-                      {option.comingSoon ? ' (Coming soon)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                {themeColorPresets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    aria-label={preset.label}
+                    onClick={() => {
+                      applyThemeColor(preset.id, resolvedTheme === 'dark')
+                      setThemeColor(preset.id)
+                    }}
+                    className="press-scale relative flex size-6 items-center justify-center rounded-full ring-2 ring-offset-2 ring-offset-card transition-shadow"
+                    style={
+                      {
+                        backgroundColor: preset.swatch,
+                        '--tw-ring-color': themeColor === preset.id ? preset.swatch : 'transparent',
+                      } as CSSProperties
+                    }
+                  >
+                    {themeColor === preset.id ? <Check className="size-3.5 text-white" strokeWidth={3} /> : null}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex w-full items-center gap-2.5 py-3">
@@ -246,15 +219,26 @@ export function SettingsPage() {
               />
             </div>
 
+            {appLockEnabled && biometricSupported ? (
+              <div className="flex w-full items-center gap-2.5 py-3 pl-11">
+                <span className="flex-1 text-sm font-medium text-foreground">Unlock with Biometrics</span>
+                <Switch
+                  checked={biometricEnabled}
+                  disabled={isRegisteringBiometric}
+                  onCheckedChange={(checked) => void handleBiometricToggle(checked)}
+                />
+              </div>
+            ) : null}
+
             <button
               type="button"
               onClick={() => navigate('/settings/whatsapp')}
-              className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-3 -mx-1.5 text-left transition-colors hover:bg-accent/60"
+              className="flex w-full items-center gap-2.5 py-3 text-left"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted p-1.5">
                 <img src={whatsappLogo} alt="" className="size-full" />
               </span>
-              <span className="flex-1 text-sm font-medium text-foreground">WhatsApp Integration</span>
+              <span className="flex-1 text-sm font-medium text-foreground">Connect WhatsApp</span>
               <ChevronRight className="size-4 text-muted-foreground" />
             </button>
 
@@ -314,16 +298,6 @@ export function SettingsPage() {
       </Button>
 
       <div className="flex items-center justify-center gap-1.5 pb-4 text-center text-xs text-muted-foreground">
-        <span>StayGrid v{APP_VERSION}</span>
-        <span className="text-muted-foreground/40">·</span>
-        <button
-          type="button"
-          onClick={() => navigate('/settings/privacy-policy')}
-          className="underline underline-offset-2"
-        >
-          Privacy Policy
-        </button>
-        <span className="text-muted-foreground/40">·</span>
         <span>Made by Ravi</span>
       </div>
 
@@ -331,7 +305,7 @@ export function SettingsPage() {
         open={clearDataOpen}
         onOpenChange={setClearDataOpen}
         title="Clear all app data?"
-        description="This permanently deletes your tenants, floors, rooms, payments, expenses, and every other record. Your building profile stays as-is, so you won't have to set up again. This can't be undone."
+        description="This permanently deletes your tenants, floors, houses, payments, expenses, and every other record. Your building profile stays as-is, so you won't have to set up again. This can't be undone."
         confirmLabel="Clear Data"
         isPending={clearDataMutation.isPending}
         onConfirm={() => {
@@ -359,7 +333,7 @@ export function SettingsPage() {
         open={disableLockOpen}
         onOpenChange={setDisableLockOpen}
         title="Turn off App Lock?"
-        description="You won't need a PIN to open StayGrid anymore."
+        description="You won't need a PIN to open Jeevanam anymore."
         confirmLabel="Turn Off"
         destructive={false}
         onConfirm={() => {
@@ -368,5 +342,6 @@ export function SettingsPage() {
         }}
       />
     </div>
+    </PullToRefresh>
   )
 }

@@ -1,12 +1,11 @@
 import {
   Flame,
   Hammer,
+  ImageIcon,
   Lightbulb,
   Milk,
-  Pencil,
   Sofa,
   Sparkles,
-  Trash2,
   Users,
   Utensils,
   Wallet,
@@ -48,44 +47,35 @@ const colorByCategory: Record<ExpenseCategory, string> = {
 
 interface ExpenseListItemProps {
   expense: Expense
-  onEdit: () => void
-  onDelete: () => void
+  onSelect: () => void
 }
 
-export function ExpenseListItem({ expense, onEdit, onDelete }: ExpenseListItemProps) {
+export function ExpenseListItem({ expense, onSelect }: ExpenseListItemProps) {
   const Icon = iconByCategory[expense.category]
 
   return (
-    <div className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-all duration-200 ease-[var(--ease-out-smooth)] hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover:scale-110 ${colorByCategory[expense.category]}`}>
-          <Icon className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-foreground capitalize">{expense.category}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {formatDateTime(expense.createdAt)}
-            {expense.description ? ` · ${expense.description}` : ''}
-          </p>
-        </div>
+    <button
+      type="button"
+      onClick={onSelect}
+      className="press-scale group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-all duration-200 ease-[var(--ease-out-smooth)] hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <span className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover:scale-110 ${colorByCategory[expense.category]}`}>
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground capitalize">{expense.category}</p>
+        <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+          {formatDateTime(expense.createdAt)}
+          {expense.description ? ` · ${expense.description}` : ''}
+          {expense.imageUrls.length > 0 ? (
+            <span className="inline-flex items-center gap-0.5 text-muted-foreground/80">
+              <ImageIcon className="size-3" />
+              {expense.imageUrls.length}
+            </span>
+          ) : null}
+        </p>
       </div>
       <p className="font-numeric text-sm font-semibold text-foreground">{formatCurrency(expense.amount)}</p>
-      <button
-        type="button"
-        onClick={onEdit}
-        aria-label="Edit expense"
-        className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-      >
-        <Pencil className="size-3.5" />
-      </button>
-      <button
-        type="button"
-        onClick={onDelete}
-        aria-label="Delete expense"
-        className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
-      >
-        <Trash2 className="size-3.5" />
-      </button>
-    </div>
+    </button>
   )
 }

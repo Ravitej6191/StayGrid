@@ -23,7 +23,7 @@ export function PastTenantListItem({ tenant }: { tenant: Tenant }) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">{tenant.name}</p>
         <p className="text-xs text-muted-foreground">
-          {tenant.roomNumber ? `${tenant.floorName} · Room ${tenant.roomNumber}` : 'Was never allocated'}
+          {tenant.houseNumber ? `${tenant.floorName} · House ${tenant.houseNumber}` : 'Was never allocated'}
         </p>
       </div>
       <p className="text-right text-xs text-muted-foreground">

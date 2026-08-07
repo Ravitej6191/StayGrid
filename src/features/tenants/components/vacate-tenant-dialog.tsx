@@ -34,7 +34,7 @@ export function VacateTenantDialog({ open, onOpenChange, tenant, onVacated }: Va
       open={open}
       onOpenChange={onOpenChange}
       title={`Vacate ${tenant?.name}?`}
-      description="Their bed will become vacant and they'll move to Past Tenants. Payment history is kept."
+      description="Their house will become vacant and they'll move to Past Tenants. Payment history is kept."
       confirmLabel="Vacate"
       isPending={mutation.isPending}
       onConfirm={() => mutation.mutate()}

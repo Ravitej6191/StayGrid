@@ -22,7 +22,8 @@ function AppGate() {
   const isUnlocked = useAppLockStore((s) => s.isUnlocked)
 
   useEffect(() => {
-    applyThemeColor(getStoredThemeColor())
+    if (!resolvedTheme) return
+    applyThemeColor(getStoredThemeColor(), resolvedTheme === 'dark')
   }, [resolvedTheme])
 
   useEffect(() => {

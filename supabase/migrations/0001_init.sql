@@ -1,4 +1,4 @@
--- StayGrid initial schema — single-building PG/hostel/dorm/rental management.
+-- Jeevanam initial schema — single-building PG/hostel/dorm/rental management.
 -- MVP scope: one building per owner. owner_id ties every root table back to
 -- auth.uid() for row level security; child tables inherit scope via FK joins.
 
@@ -8,19 +8,15 @@ create extension if not exists "pgcrypto";
 -- Enums
 -- ---------------------------------------------------------------------
 create type property_type as enum ('pg', 'co_living', 'building', 'residency', 'apartment');
-create type room_type as enum (
-  'single', 'twin', 'sharing_3', 'sharing_4', 'sharing_5', 'sharing_6', 'sharing_7', 'sharing_8', 'dorm'
-);
-create type bed_status as enum ('vacant', 'occupied', 'maintenance');
+create type house_type as enum ('1bhk', '2bhk', '3bhk');
 create type tenant_status as enum ('active', 'vacated');
 create type rent_status as enum ('paid', 'partial', 'pending', 'advance');
 create type payment_mode as enum ('cash', 'upi', 'bank_transfer', 'cheque');
+create type lender_type as enum ('bank', 'society', 'dwakara', 'hand_cash', 'gold_loan', 'other');
 create type expense_category as enum (
   'food', 'groceries', 'milk', 'vegetables', 'gas', 'electricity',
   'internet', 'cleaning', 'repairs', 'furniture', 'salary', 'misc'
 );
-create type maintenance_priority as enum ('low', 'medium', 'high', 'urgent');
-create type maintenance_status as enum ('open', 'in_progress', 'completed', 'cancelled');
 create type inventory_category as enum (
   'kitchen', 'furniture', 'cleaning', 'appliances', 'gas_cylinders',
   'mattresses', 'beds', 'fans', 'buckets', 'water_cans', 'misc'
@@ -51,8 +47,6 @@ create table building (
   pincode text,
   contact_phone text,
   contact_email text,
-  gst_number text,
-  pan_number text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -73,52 +67,38 @@ create table floors (
 );
 
 -- ---------------------------------------------------------------------
--- rooms
+-- houses (a floor's individually rentable units — a tenant is assigned
+-- directly to a house, up to its capacity; there is no further bed-level
+-- subdivision)
 -- ---------------------------------------------------------------------
-create table rooms (
+create table houses (
   id uuid primary key default gen_random_uuid(),
   floor_id uuid not null references floors(id) on delete cascade,
-  room_number text not null,
-  room_type room_type not null default 'single',
-  capacity int not null default 1,
+  house_number text not null,
+  house_type house_type not null default '1bhk',
   attached_bathroom boolean not null default false,
+  gas_connection_number text,
+  electricity_bill_number text,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (floor_id, room_number)
+  unique (floor_id, house_number)
 );
-create trigger rooms_set_updated_at before update on rooms
+create trigger houses_set_updated_at before update on houses
   for each row execute function set_updated_at();
 
 -- ---------------------------------------------------------------------
--- beds
--- ---------------------------------------------------------------------
-create table beds (
-  id uuid primary key default gen_random_uuid(),
-  room_id uuid not null references rooms(id) on delete cascade,
-  bed_label text not null,
-  status bed_status not null default 'vacant',
-  created_at timestamptz not null default now(),
-  unique (room_id, bed_label)
-);
-
--- ---------------------------------------------------------------------
--- tenants (at most one active tenant per bed)
+-- tenants (at most one active tenant per house)
 -- ---------------------------------------------------------------------
 create table tenants (
   id uuid primary key default gen_random_uuid(),
   building_id uuid not null references building(id) on delete cascade,
-  bed_id uuid references beds(id) on delete set null,
+  house_id uuid references houses(id) on delete set null,
   name text not null,
   phone text not null,
-  email text,
   aadhaar_number text,
-  emergency_contact_name text,
-  emergency_contact_phone text,
   address text,
   occupation text,
-  company text,
-  blood_group text,
   photo_url text,
   joining_date date not null default current_date,
   vacating_date date,
@@ -134,8 +114,8 @@ create table tenants (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create unique index tenants_one_active_per_bed on tenants(bed_id)
-  where status = 'active' and bed_id is not null;
+create unique index tenants_one_active_per_house on tenants(house_id)
+  where status = 'active' and house_id is not null;
 create trigger tenants_set_updated_at before update on tenants
   for each row execute function set_updated_at();
 
@@ -159,6 +139,32 @@ create table payments (
 );
 
 -- ---------------------------------------------------------------------
+-- loans
+-- ---------------------------------------------------------------------
+create table loans (
+  id uuid primary key default gen_random_uuid(),
+  building_id uuid not null references building(id) on delete cascade,
+  lender_type lender_type not null default 'bank',
+  lender_name text,
+  amount numeric(10, 2) not null,
+  interest_note text,
+  taken_on date not null default current_date,
+  taken_till date,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table loan_repayments (
+  id uuid primary key default gen_random_uuid(),
+  loan_id uuid not null references loans(id) on delete cascade,
+  amount numeric(10, 2) not null,
+  payment_date date not null default current_date,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
 -- expenses
 -- ---------------------------------------------------------------------
 create table expenses (
@@ -168,31 +174,9 @@ create table expenses (
   amount numeric(10, 2) not null,
   expense_date date not null default current_date,
   description text,
-  invoice_url text,
+  invoice_urls text[] not null default '{}',
   created_at timestamptz not null default now()
 );
-
--- ---------------------------------------------------------------------
--- maintenance
--- ---------------------------------------------------------------------
-create table maintenance (
-  id uuid primary key default gen_random_uuid(),
-  room_id uuid not null references rooms(id) on delete cascade,
-  title text not null,
-  description text,
-  priority maintenance_priority not null default 'medium',
-  status maintenance_status not null default 'open',
-  vendor_name text,
-  cost numeric(10, 2),
-  invoice_url text,
-  photos text[] not null default '{}',
-  completion_date date,
-  notes text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create trigger maintenance_set_updated_at before update on maintenance
-  for each row execute function set_updated_at();
 
 -- ---------------------------------------------------------------------
 -- inventory
@@ -290,12 +274,12 @@ create trigger settings_set_updated_at before update on settings
 -- ---------------------------------------------------------------------
 alter table building enable row level security;
 alter table floors enable row level security;
-alter table rooms enable row level security;
-alter table beds enable row level security;
+alter table houses enable row level security;
 alter table tenants enable row level security;
 alter table payments enable row level security;
+alter table loans enable row level security;
+alter table loan_repayments enable row level security;
 alter table expenses enable row level security;
-alter table maintenance enable row level security;
 alter table inventory enable row level security;
 alter table documents enable row level security;
 alter table activities enable row level security;
@@ -313,29 +297,16 @@ create policy floors_owner_all on floors
     exists (select 1 from building b where b.id = floors.building_id and b.owner_id = auth.uid())
   );
 
-create policy rooms_owner_all on rooms
+create policy houses_owner_all on houses
   for all using (
     exists (
       select 1 from floors f join building b on b.id = f.building_id
-      where f.id = rooms.floor_id and b.owner_id = auth.uid()
+      where f.id = houses.floor_id and b.owner_id = auth.uid()
     )
   ) with check (
     exists (
       select 1 from floors f join building b on b.id = f.building_id
-      where f.id = rooms.floor_id and b.owner_id = auth.uid()
-    )
-  );
-
-create policy beds_owner_all on beds
-  for all using (
-    exists (
-      select 1 from rooms r join floors f on f.id = r.floor_id join building b on b.id = f.building_id
-      where r.id = beds.room_id and b.owner_id = auth.uid()
-    )
-  ) with check (
-    exists (
-      select 1 from rooms r join floors f on f.id = r.floor_id join building b on b.id = f.building_id
-      where r.id = beds.room_id and b.owner_id = auth.uid()
+      where f.id = houses.floor_id and b.owner_id = auth.uid()
     )
   );
 
@@ -359,24 +330,31 @@ create policy payments_owner_all on payments
     )
   );
 
+create policy loans_owner_all on loans
+  for all using (
+    exists (select 1 from building b where b.id = loans.building_id and b.owner_id = auth.uid())
+  ) with check (
+    exists (select 1 from building b where b.id = loans.building_id and b.owner_id = auth.uid())
+  );
+
+create policy loan_repayments_owner_all on loan_repayments
+  for all using (
+    exists (
+      select 1 from loans l join building b on b.id = l.building_id
+      where l.id = loan_repayments.loan_id and b.owner_id = auth.uid()
+    )
+  ) with check (
+    exists (
+      select 1 from loans l join building b on b.id = l.building_id
+      where l.id = loan_repayments.loan_id and b.owner_id = auth.uid()
+    )
+  );
+
 create policy expenses_owner_all on expenses
   for all using (
     exists (select 1 from building b where b.id = expenses.building_id and b.owner_id = auth.uid())
   ) with check (
     exists (select 1 from building b where b.id = expenses.building_id and b.owner_id = auth.uid())
-  );
-
-create policy maintenance_owner_all on maintenance
-  for all using (
-    exists (
-      select 1 from rooms r join floors f on f.id = r.floor_id join building b on b.id = f.building_id
-      where r.id = maintenance.room_id and b.owner_id = auth.uid()
-    )
-  ) with check (
-    exists (
-      select 1 from rooms r join floors f on f.id = r.floor_id join building b on b.id = f.building_id
-      where r.id = maintenance.room_id and b.owner_id = auth.uid()
-    )
   );
 
 create policy inventory_owner_all on inventory
@@ -445,13 +423,11 @@ create policy tenant_uploads_owner_all on storage.objects
 -- Indexes for common lookups
 -- ---------------------------------------------------------------------
 create index floors_building_id_idx on floors(building_id);
-create index rooms_floor_id_idx on rooms(floor_id);
-create index beds_room_id_idx on beds(room_id);
-create index tenants_bed_id_idx on tenants(bed_id);
+create index houses_floor_id_idx on houses(floor_id);
+create index tenants_house_id_idx on tenants(house_id);
 create index tenants_building_id_idx on tenants(building_id);
 create index payments_tenant_id_idx on payments(tenant_id);
 create index expenses_building_id_idx on expenses(building_id);
-create index maintenance_room_id_idx on maintenance(room_id);
 create index inventory_building_id_idx on inventory(building_id);
 create index documents_tenant_id_idx on documents(tenant_id);
 create index activities_building_id_idx on activities(building_id);

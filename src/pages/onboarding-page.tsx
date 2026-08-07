@@ -34,14 +34,14 @@ export function OnboardingPage() {
   return (
     <div className="relative min-h-svh overflow-hidden">
       <AuroraBackground />
-      <div className="relative z-10 flex min-h-svh flex-col px-6 py-10">
+      <div className="relative z-10 flex min-h-svh flex-col px-6 py-8">
         <div className="mb-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
               <Building2 className="size-5" />
             </div>
             <div>
-              <p className="text-base font-semibold tracking-tight text-foreground">StayGrid</p>
+              <p className="text-base font-semibold tracking-tight text-foreground">Jeevanam</p>
               <p className="text-xs text-muted-foreground">Set up your property</p>
             </div>
           </div>

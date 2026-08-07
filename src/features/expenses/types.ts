@@ -8,7 +8,7 @@ export interface Expense {
   amount: number
   expenseDate: string
   description: string | null
-  imageUrl: string | null
+  imageUrls: string[]
   /** When this expense was actually recorded — distinct from `expenseDate`,
    * which the user can backdate. Carries the real time of day. */
   createdAt: string

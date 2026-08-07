@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import { BedDouble, Camera, CheckCircle2, Loader2, UserRound, X } from 'lucide-react'
+import { Camera, CheckCircle2, Home, Loader2, UserRound, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { EmptyState } from '@/components/common/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useBuildingData } from '@/features/building/hooks/use-building-data'
@@ -32,18 +31,11 @@ function Required() {
 const PHONE_REGEX = /^[6-9]\d{9}$/
 const MAX_AMOUNT = 10_000_000
 
-const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const
-
 const tenantSchema = z.object({
   name: z.string().min(2, 'Enter a name').max(80, 'Name is too long'),
   phone: z.string().regex(PHONE_REGEX, 'Enter a valid 10-digit mobile number'),
-  email: z.string().max(254, 'Email is too long').refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Enter a valid email'),
   aadhaarNumber: z.string().regex(/^\d{4}-\d{4}-\d{4}$/, 'Enter a valid 12-digit Aadhaar number'),
-  emergencyContactName: z.string().max(80, 'Name is too long'),
-  emergencyContactPhone: z.string().refine((v) => !v || PHONE_REGEX.test(v), 'Enter a valid phone number'),
-  bloodGroup: z.string(),
   occupation: z.string().max(60, 'Too long'),
-  company: z.string().max(80, 'Too long'),
   rent: z.number().positive('Enter a valid amount').max(MAX_AMOUNT, 'Amount seems too high'),
   deposit: z.number().min(0).max(MAX_AMOUNT, 'Amount seems too high'),
 })
@@ -53,13 +45,8 @@ type TenantFormValues = z.infer<typeof tenantSchema>
 const emptyValues = (): TenantFormValues => ({
   name: '',
   phone: '',
-  email: '',
   aadhaarNumber: '',
-  emergencyContactName: '',
-  emergencyContactPhone: '',
-  bloodGroup: '',
   occupation: '',
-  company: '',
   rent: 0,
   deposit: 0,
 })
@@ -78,7 +65,7 @@ export function AddTenantPage() {
   const { data: building } = useBuildingData()
   const [view, setView] = useState<View>('form')
   const [createdTenant, setCreatedTenant] = useState<{ id: string; name: string } | null>(null)
-  const [allocatedBedLabel, setAllocatedBedLabel] = useState<string | null>(null)
+  const [allocatedHouseLabel, setAllocatedHouseLabel] = useState<string | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
@@ -87,7 +74,6 @@ export function AddTenantPage() {
 
   const {
     register,
-    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -105,13 +91,8 @@ export function AddTenantPage() {
       reset({
         name: existingTenant.name,
         phone: existingTenant.phone,
-        email: existingTenant.email ?? '',
         aadhaarNumber: existingTenant.aadhaarNumber ? formatAadhaar(existingTenant.aadhaarNumber) : '',
-        emergencyContactName: existingTenant.emergencyContactName ?? '',
-        emergencyContactPhone: existingTenant.emergencyContactPhone ?? '',
-        bloodGroup: existingTenant.bloodGroup ?? '',
         occupation: existingTenant.occupation ?? '',
-        company: existingTenant.company ?? '',
         rent: existingTenant.rent,
         deposit: existingTenant.deposit,
       })
@@ -121,18 +102,16 @@ export function AddTenantPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingTenant, isEditing])
 
-  const bedOptions = useMemo(() => {
+  const houseOptions = useMemo(() => {
     if (!building) return []
-    const options: { bedId: string; label: string }[] = []
+    const options: { houseId: string; label: string }[] = []
     for (const floor of building.floors) {
-      for (const room of floor.rooms) {
-        for (const bed of room.beds) {
-          if (bed.status === 'vacant') {
-            options.push({
-              bedId: bed.id,
-              label: `${floor.name} · Room ${room.roomNumber} · Bed ${bed.bedLabel}`,
-            })
-          }
+      for (const house of floor.houses) {
+        if (house.tenant === null) {
+          options.push({
+            houseId: house.id,
+            label: `${floor.name} · House ${house.houseNumber}`,
+          })
         }
       }
     }
@@ -168,15 +147,15 @@ export function AddTenantPage() {
   })
 
   const allocateMutation = useMutation({
-    mutationFn: ({ tenantId, bedId }: { tenantId: string; bedId: string }) => reassignTenant(tenantId, bedId),
+    mutationFn: ({ tenantId, houseId }: { tenantId: string; houseId: string }) => reassignTenant(tenantId, houseId),
     onSuccess: async (_, variables) => {
       await invalidateAll()
-      const bed = bedOptions.find((b) => b.bedId === variables.bedId)
-      setAllocatedBedLabel(bed?.label ?? null)
+      const house = houseOptions.find((h) => h.houseId === variables.houseId)
+      setAllocatedHouseLabel(house?.label ?? null)
       setView('allocated')
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : 'Could not allocate a bed. Please try again.'),
+      toast.error(error instanceof Error ? error.message : 'Could not allocate a house. Please try again.'),
   })
 
   const isPending = createMutation.isPending || updateMutation.isPending || isUploadingPhoto
@@ -198,13 +177,8 @@ export function AddTenantPage() {
     const shared = {
       name: values.name,
       phone: values.phone,
-      email: values.email || null,
       aadhaarNumber: values.aadhaarNumber.replace(/-/g, '') || null,
-      emergencyContactName: values.emergencyContactName || null,
-      emergencyContactPhone: values.emergencyContactPhone || null,
-      bloodGroup: values.bloodGroup || null,
       occupation: values.occupation || null,
-      company: values.company || null,
       photoUrl,
       rent: values.rent,
       deposit: values.deposit,
@@ -213,7 +187,7 @@ export function AddTenantPage() {
     if (existingTenant) {
       updateMutation.mutate({ id: existingTenant.id, ...shared })
     } else {
-      createMutation.mutate({ bedId: null, ...shared })
+      createMutation.mutate({ houseId: null, ...shared })
     }
   }
 
@@ -263,14 +237,14 @@ export function AddTenantPage() {
         </motion.div>
         <div className="space-y-1">
           <p className="text-base font-semibold text-foreground">{createdTenant.name} added</p>
-          <p className="text-sm text-muted-foreground">Allocate a room and bed now, or do it later from Building.</p>
+          <p className="text-sm text-muted-foreground">Allocate a house now, or do it later from Building.</p>
         </div>
         <div className="flex w-full gap-2 pt-2">
-          <Button variant="outline" className="flex-1" onClick={() => navigate('/tenants', { replace: true })}>
+          <Button variant="outline" className="flex-1" onClick={() => navigate(`/tenants/${createdTenant.id}`, { replace: true })}>
             Done
           </Button>
           <Button className="flex-1" onClick={() => setView('allocate')}>
-            Allocate Room
+            Allocate House
           </Button>
         </div>
       </div>
@@ -280,26 +254,26 @@ export function AddTenantPage() {
   if (view === 'allocate' && createdTenant) {
     return (
       <div className="space-y-3">
-        {bedOptions.length === 0 ? (
-          <EmptyState icon={BedDouble} title="No vacant beds" description="Add a room or free up a bed first." />
+        {houseOptions.length === 0 ? (
+          <EmptyState icon={Home} title="No vacant houses" description="Add a house or free up a slot first." />
         ) : (
           <div className="space-y-2">
-            {bedOptions.map((option) => (
+            {houseOptions.map((option) => (
               <button
-                key={option.bedId}
+                key={option.houseId}
                 type="button"
                 disabled={allocateMutation.isPending}
-                onClick={() => allocateMutation.mutate({ tenantId: createdTenant.id, bedId: option.bedId })}
+                onClick={() => allocateMutation.mutate({ tenantId: createdTenant.id, houseId: option.houseId })}
                 className="flex w-full items-center gap-3 rounded-lg border border-border/70 bg-card/60 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent disabled:opacity-60"
               >
-                <BedDouble className="size-4 shrink-0 text-muted-foreground" />
+                <Home className="size-4 shrink-0 text-muted-foreground" />
                 <span className="flex-1 text-foreground">{option.label}</span>
                 {allocateMutation.isPending ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
               </button>
             ))}
           </div>
         )}
-        <Button variant="outline" className="w-full" onClick={() => navigate('/tenants', { replace: true })}>
+        <Button variant="outline" className="w-full" onClick={() => navigate(`/tenants/${createdTenant.id}`, { replace: true })}>
           Skip for Now
         </Button>
       </div>
@@ -320,7 +294,7 @@ export function AddTenantPage() {
         <div className="space-y-1">
           <p className="text-base font-semibold text-foreground">Tenant allocated</p>
           <p className="text-sm text-muted-foreground">
-            {createdTenant.name} moved into {allocatedBedLabel ?? 'the selected bed'}.
+            {createdTenant.name} moved into {allocatedHouseLabel ?? 'the selected house'}.
           </p>
         </div>
         <Button className="w-full" onClick={() => navigate(`/tenants/${createdTenant.id}`, { replace: true })}>
@@ -378,25 +352,18 @@ export function AddTenantPage() {
         {errors.name ? <p className="text-xs text-danger">{errors.name.message}</p> : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="phone">
-            Phone
-            <Required />
-          </Label>
-          <Input
-            id="phone"
-            inputMode="numeric"
-            maxLength={10}
-            {...register('phone', { onChange: (e) => { e.target.value = digitsOnly(e.target.value, 10) } })}
-          />
-          {errors.phone ? <p className="text-xs text-danger">{errors.phone.message}</p> : null}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" maxLength={254} {...register('email')} />
-          {errors.email ? <p className="text-xs text-danger">{errors.email.message}</p> : null}
-        </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="phone">
+          Phone
+          <Required />
+        </Label>
+        <Input
+          id="phone"
+          inputMode="numeric"
+          maxLength={10}
+          {...register('phone', { onChange: (e) => { e.target.value = digitsOnly(e.target.value, 10) } })}
+        />
+        {errors.phone ? <p className="text-xs text-danger">{errors.phone.message}</p> : null}
       </div>
 
       <div className="space-y-1.5">
@@ -414,63 +381,9 @@ export function AddTenantPage() {
         {errors.aadhaarNumber ? <p className="text-xs text-danger">{errors.aadhaarNumber.message}</p> : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="emergencyContactName">Emergency Contact Person</Label>
-          <Input id="emergencyContactName" maxLength={80} {...register('emergencyContactName')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="emergencyContactPhone">Emergency Phone Number</Label>
-          <Input
-            id="emergencyContactPhone"
-            inputMode="numeric"
-            maxLength={10}
-            {...register('emergencyContactPhone', { onChange: (e) => { e.target.value = digitsOnly(e.target.value, 10) } })}
-          />
-          {errors.emergencyContactPhone ? (
-            <p className="text-xs text-danger">{errors.emergencyContactPhone.message}</p>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label>Blood Group</Label>
-          <Controller
-            name="bloodGroup"
-            control={control}
-            render={({ field }) => (
-              // key={field.value} forces Radix's Select to remount instead
-              // of receiving the new value as a prop change — when the
-              // value is set programmatically (react-hook-form's reset()
-              // when editing) rather than by the user opening the dropdown,
-              // Radix doesn't recognize it and silently fires
-              // onValueChange('') to "correct" itself, wiping the value we
-              // just set. Remounting sidesteps that self-correction.
-              <Select key={field.value} value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bloodGroups.map((group) => (
-                    <SelectItem key={group} value={group}>
-                      {group}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="occupation">Occupation</Label>
-          <Input id="occupation" maxLength={60} {...register('occupation')} />
-        </div>
-      </div>
-
       <div className="space-y-1.5">
-        <Label htmlFor="company">Company / College</Label>
-        <Input id="company" maxLength={80} {...register('company')} />
+        <Label htmlFor="occupation">Occupation</Label>
+        <Input id="occupation" maxLength={60} {...register('occupation')} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -2,42 +2,35 @@ import { isDemoSession } from '@/config/env'
 import { supabase } from '@/lib/supabase'
 import {
   addFloor as demoAddFloor,
-  addRoom as demoAddRoom,
+  addHouse as demoAddHouse,
   deleteFloor as demoDeleteFloor,
-  deleteRoom as demoDeleteRoom,
+  deleteHouse as demoDeleteHouse,
   getDemoDb,
   resolveTenant,
   updateFloor as demoUpdateFloor,
-  updateRoom as demoUpdateRoom,
+  updateHouse as demoUpdateHouse,
   type AddFloorInput,
-  type AddRoomInput,
-  type UpdateRoomInput,
+  type AddHouseInput,
+  type UpdateHouseInput,
 } from '@/lib/demo-store'
 import type { TenantRow } from '@/types/database.types'
 import type { Tenant } from '@/types/domain'
 import type { OccupancyStatus } from '@/constants/status'
-import type { Bed, BuildingSummary, Floor, Room } from '../types'
+import type { BuildingSummary, Floor, House } from '../types'
 
 export interface BuildingData {
   building: BuildingSummary
   floors: Floor[]
 }
 
-function deriveRoomFlags(beds: Bed[]): {
-  occupiedCount: number
-  vacantCount: number
+function deriveHouseFlags(tenant: Tenant | null): {
   occupancyStatus: OccupancyStatus
   hasRentPending: boolean
 } {
-  const occupiedCount = beds.filter((b) => b.status === 'occupied').length
-  const vacantCount = beds.filter((b) => b.status === 'vacant').length
-  const hasRentPending = beds.some((b) => b.tenant?.rentStatus === 'pending')
-
-  let occupancyStatus: OccupancyStatus = 'vacant'
-  if (occupiedCount > 0 && occupiedCount === beds.length) occupancyStatus = 'occupied'
-  else if (occupiedCount > 0) occupancyStatus = 'partial'
-
-  return { occupiedCount, vacantCount, occupancyStatus, hasRentPending }
+  return {
+    occupancyStatus: tenant ? 'occupied' : 'vacant',
+    hasRentPending: tenant?.rentStatus === 'pending',
+  }
 }
 
 function getDemoData(): BuildingData {
@@ -47,32 +40,23 @@ function getDemoData(): BuildingData {
     .slice()
     .sort((a, b) => a.floorNumber - b.floorNumber)
     .map((floor) => {
-      const rooms: Room[] = db.rooms
-        .filter((r) => r.floorId === floor.id)
-        .map((room) => {
-          const beds: Bed[] = db.beds
-            .filter((b) => b.roomId === room.id)
-            .map((bed) => {
-              const demoTenant = db.tenants.find((t) => t.bedId === bed.id && t.status === 'active')
-              return {
-                id: bed.id,
-                roomId: bed.roomId,
-                bedLabel: bed.bedLabel,
-                status: bed.status,
-                tenant: demoTenant ? resolveTenant(db, demoTenant) : null,
-              }
-            })
+      const houses: House[] = db.houses
+        .filter((h) => h.floorId === floor.id)
+        .map((house) => {
+          const demoTenant = db.tenants.find((t) => t.houseId === house.id && t.status === 'active')
+          const tenant = demoTenant ? resolveTenant(db, demoTenant) : null
           return {
-            id: room.id,
-            floorId: room.floorId,
-            roomNumber: room.roomNumber,
-            roomType: room.roomType,
-            capacity: room.capacity,
-            beds,
-            ...deriveRoomFlags(beds),
+            id: house.id,
+            floorId: house.floorId,
+            houseNumber: house.houseNumber,
+            houseType: house.houseType,
+            gasConnectionNumber: house.gasConnectionNumber,
+            electricityBillNumber: house.electricityBillNumber,
+            tenant,
+            ...deriveHouseFlags(tenant),
           }
         })
-      return { id: floor.id, buildingId: floor.buildingId, floorNumber: floor.floorNumber, name: floor.name, rooms }
+      return { id: floor.id, buildingId: floor.buildingId, floorNumber: floor.floorNumber, name: floor.name, houses }
     })
 
   const building: BuildingSummary = {
@@ -86,11 +70,8 @@ function getDemoData(): BuildingData {
     pincode: db.building.pincode,
     contactPhone: db.building.contactPhone,
     contactEmail: db.building.contactEmail,
-    gstNumber: db.building.gstNumber,
-    panNumber: db.building.panNumber,
     totalFloors: floors.length,
-    totalRooms: db.rooms.length,
-    totalBeds: db.beds.length,
+    totalHouses: db.houses.length,
   }
 
   return { building, floors }
@@ -98,23 +79,17 @@ function getDemoData(): BuildingData {
 
 // ---- Real Supabase path (scaffolded; not yet exercised until connected) ----
 
-function mapTenantRow(row: TenantRow, roomId: string, roomNumber: string, floorName: string): Tenant {
+function mapTenantRow(row: TenantRow, houseNumber: string, floorName: string): Tenant {
   return {
     id: row.id,
-    bedId: row.bed_id,
-    roomId,
-    roomNumber,
+    houseId: row.house_id,
+    houseNumber,
     floorName,
     name: row.name,
     phone: row.phone,
-    email: row.email,
     aadhaarNumber: row.aadhaar_number,
-    emergencyContactName: row.emergency_contact_name,
-    emergencyContactPhone: row.emergency_contact_phone,
     address: row.address,
     occupation: row.occupation,
-    company: row.company,
-    bloodGroup: row.blood_group,
     photoUrl: row.photo_url,
     joiningDate: row.joining_date,
     vacatingDate: row.vacating_date,
@@ -165,79 +140,50 @@ async function fetchFromSupabase(): Promise<BuildingData> {
   if (floorsError) throw floorsError
 
   const floorIds = floorRows.map((f) => f.id)
-  const { data: roomRows, error: roomsError } = await supabase
-    .from('rooms')
+  const { data: houseRows, error: housesError } = await supabase
+    .from('houses')
     .select('*')
     .in('floor_id', floorIds)
-    .order('room_number', { ascending: true })
-  if (roomsError) throw roomsError
+    .order('house_number', { ascending: true })
+  if (housesError) throw housesError
 
-  const roomIds = roomRows.map((r) => r.id)
-  const { data: bedRows, error: bedsError } = await supabase
-    .from('beds')
-    .select('*')
-    .in('room_id', roomIds)
-    .order('bed_label', { ascending: true })
-  if (bedsError) throw bedsError
-
-  const bedIds = bedRows.map((b) => b.id)
+  const houseIds = houseRows.map((h) => h.id)
   const { data: tenantRows, error: tenantsError } = await supabase
     .from('tenants')
     .select('*')
-    .in('bed_id', bedIds)
+    .in('house_id', houseIds)
     .eq('status', 'active')
   if (tenantsError) throw tenantsError
 
-  const roomNumberById = new Map(roomRows.map((r) => [r.id, r.room_number]))
+  const houseNumberById = new Map(houseRows.map((h) => [h.id, h.house_number]))
+  const floorIdByHouseId = new Map(houseRows.map((h) => [h.id, h.floor_id]))
   const floorNameById = new Map(floorRows.map((f) => [f.id, f.name]))
-  const roomIdByBedId = new Map(bedRows.map((b) => [b.id, b.room_id]))
-  const floorIdByRoomId = new Map(roomRows.map((r) => [r.id, r.floor_id]))
 
-  const tenantByBedId = new Map(
-    tenantRows
-      .filter((t): t is TenantRow & { bed_id: string } => t.bed_id !== null)
-      .map((t) => {
-        const roomId = roomIdByBedId.get(t.bed_id) ?? ''
-        const floorId = floorIdByRoomId.get(roomId)
-        const roomNumber = roomNumberById.get(roomId) ?? ''
-        const floorName = (floorId && floorNameById.get(floorId)) || ''
-        return [t.bed_id, mapTenantRow(t, roomId, roomNumber, floorName)] as const
-      }),
-  )
-
-  const bedsByRoomId = new Map<string, Bed[]>()
-  for (const bedRow of bedRows) {
-    const bed: Bed = {
-      id: bedRow.id,
-      roomId: bedRow.room_id,
-      bedLabel: bedRow.bed_label,
-      // The 'maintenance' bed status has no UI path that can ever set it —
-      // nothing writes it, so treat it as vacant if it's ever found (e.g.
-      // set manually in the DB) rather than surfacing a status the app has
-      // no way to display or clear.
-      status: bedRow.status === 'occupied' ? 'occupied' : 'vacant',
-      tenant: tenantByBedId.get(bedRow.id) ?? null,
-    }
-    const list = bedsByRoomId.get(bedRow.room_id) ?? []
-    list.push(bed)
-    bedsByRoomId.set(bedRow.room_id, list)
+  const tenantByHouseId = new Map<string, Tenant>()
+  for (const row of tenantRows) {
+    if (row.house_id === null) continue
+    const floorId = floorIdByHouseId.get(row.house_id)
+    const houseNumber = houseNumberById.get(row.house_id) ?? ''
+    const floorName = (floorId && floorNameById.get(floorId)) || ''
+    tenantByHouseId.set(row.house_id, mapTenantRow(row, houseNumber, floorName))
   }
 
-  const roomsByFloorId = new Map<string, Room[]>()
-  for (const roomRow of roomRows) {
-    const beds = bedsByRoomId.get(roomRow.id) ?? []
-    const room: Room = {
-      id: roomRow.id,
-      floorId: roomRow.floor_id,
-      roomNumber: roomRow.room_number,
-      roomType: roomRow.room_type,
-      capacity: roomRow.capacity,
-      beds,
-      ...deriveRoomFlags(beds),
+  const housesByFloorId = new Map<string, House[]>()
+  for (const houseRow of houseRows) {
+    const tenant = tenantByHouseId.get(houseRow.id) ?? null
+    const house: House = {
+      id: houseRow.id,
+      floorId: houseRow.floor_id,
+      houseNumber: houseRow.house_number,
+      houseType: houseRow.house_type,
+      gasConnectionNumber: houseRow.gas_connection_number,
+      electricityBillNumber: houseRow.electricity_bill_number,
+      tenant,
+      ...deriveHouseFlags(tenant),
     }
-    const list = roomsByFloorId.get(roomRow.floor_id) ?? []
-    list.push(room)
-    roomsByFloorId.set(roomRow.floor_id, list)
+    const list = housesByFloorId.get(houseRow.floor_id) ?? []
+    list.push(house)
+    housesByFloorId.set(houseRow.floor_id, list)
   }
 
   const floors: Floor[] = floorRows.map((f) => ({
@@ -245,7 +191,7 @@ async function fetchFromSupabase(): Promise<BuildingData> {
     buildingId: f.building_id,
     floorNumber: f.floor_number,
     name: f.name,
-    rooms: roomsByFloorId.get(f.id) ?? [],
+    houses: housesByFloorId.get(f.id) ?? [],
   }))
 
   const building: BuildingSummary = {
@@ -259,11 +205,8 @@ async function fetchFromSupabase(): Promise<BuildingData> {
     pincode: buildingRow.pincode ?? '',
     contactPhone: buildingRow.contact_phone ?? '',
     contactEmail: buildingRow.contact_email ?? '',
-    gstNumber: buildingRow.gst_number,
-    panNumber: buildingRow.pan_number,
     totalFloors: floors.length,
-    totalRooms: roomRows.length,
-    totalBeds: bedRows.length,
+    totalHouses: houseRows.length,
   }
 
   return { building, floors }
@@ -316,120 +259,72 @@ export async function deleteFloor(floorId: string): Promise<void> {
     return
   }
 
-  const { data: rooms, error: roomsError } = await supabase.from('rooms').select('id').eq('floor_id', floorId)
-  if (roomsError) throw roomsError
-  const roomIds = rooms.map((r) => r.id)
+  const { data: houses, error: housesError } = await supabase.from('houses').select('id').eq('floor_id', floorId)
+  if (housesError) throw housesError
+  const houseIds = houses.map((h) => h.id)
 
-  if (roomIds.length > 0) {
-    const { data: beds, error: bedsError } = await supabase.from('beds').select('id').in('room_id', roomIds)
-    if (bedsError) throw bedsError
-    const bedIds = beds.map((b) => b.id)
-
-    if (bedIds.length > 0) {
-      const { count, error: tenantsError } = await supabase
-        .from('tenants')
-        .select('id', { count: 'exact', head: true })
-        .in('bed_id', bedIds)
-        .eq('status', 'active')
-      if (tenantsError) throw tenantsError
-      if ((count ?? 0) > 0) throw new Error('Move or vacate tenants on this floor before deleting it.')
-    }
+  if (houseIds.length > 0) {
+    const { count, error: tenantsError } = await supabase
+      .from('tenants')
+      .select('id', { count: 'exact', head: true })
+      .in('house_id', houseIds)
+      .eq('status', 'active')
+    if (tenantsError) throw tenantsError
+    if ((count ?? 0) > 0) throw new Error('Move or vacate tenants on this floor before deleting it.')
   }
 
   const { error } = await supabase.from('floors').delete().eq('id', floorId)
   if (error) throw error
 }
 
-export async function createRoom(input: AddRoomInput): Promise<void> {
+export async function createHouse(input: AddHouseInput): Promise<void> {
   if (isDemoSession()) {
-    demoAddRoom(input)
+    demoAddHouse(input)
     return
   }
 
-  const { data: roomRow, error: roomError } = await supabase
-    .from('rooms')
-    .insert({
-      floor_id: input.floorId,
-      room_number: input.roomNumber,
-      room_type: input.roomType,
-      capacity: input.capacity,
-    })
-    .select('id')
-    .single()
-  if (roomError) throw roomError
-
-  const bedsToInsert = Array.from({ length: input.capacity }, (_, i) => ({
-    room_id: roomRow.id,
-    bed_label: String.fromCharCode(65 + i),
-    status: 'vacant' as const,
-  }))
-  const { error: bedsError } = await supabase.from('beds').insert(bedsToInsert)
-  if (bedsError) throw bedsError
+  const { error } = await supabase.from('houses').insert({
+    floor_id: input.floorId,
+    house_number: input.houseNumber,
+    house_type: input.houseType,
+    gas_connection_number: input.gasConnectionNumber,
+    electricity_bill_number: input.electricityBillNumber,
+  })
+  if (error) throw error
 }
 
-export async function updateRoom(input: UpdateRoomInput): Promise<void> {
+export async function updateHouse(input: UpdateHouseInput): Promise<void> {
   if (isDemoSession()) {
-    demoUpdateRoom(input)
+    demoUpdateHouse(input)
     return
-  }
-
-  const { data: existingBeds, error: bedsError } = await supabase
-    .from('beds')
-    .select('id, status, bed_label')
-    .eq('room_id', input.id)
-    .order('bed_label', { ascending: true })
-  if (bedsError) throw bedsError
-
-  if (input.capacity > existingBeds.length) {
-    let maxIndex = -1
-    for (const bed of existingBeds) {
-      const index = bed.bed_label.charCodeAt(0) - 65
-      if (index > maxIndex) maxIndex = index
-    }
-    const nextLabelStart = maxIndex + 1
-    const bedsToInsert = Array.from({ length: input.capacity - existingBeds.length }, (_, i) => ({
-      room_id: input.id,
-      bed_label: String.fromCharCode(65 + nextLabelStart + i),
-      status: 'vacant' as const,
-    }))
-    const { error: insertError } = await supabase.from('beds').insert(bedsToInsert)
-    if (insertError) throw insertError
-  } else if (input.capacity < existingBeds.length) {
-    const removeCount = existingBeds.length - input.capacity
-    const removableBeds = existingBeds.filter((b) => b.status === 'vacant')
-    if (removableBeds.length < removeCount) {
-      throw new Error('Vacate tenants before reducing the bed count.')
-    }
-    const idsToRemove = removableBeds.slice(0, removeCount).map((b) => b.id)
-    const { error: deleteError } = await supabase.from('beds').delete().in('id', idsToRemove)
-    if (deleteError) throw deleteError
   }
 
   const { error } = await supabase
-    .from('rooms')
+    .from('houses')
     .update({
-      room_number: input.roomNumber,
-      room_type: input.roomType,
-      capacity: input.capacity,
+      house_number: input.houseNumber,
+      house_type: input.houseType,
+      gas_connection_number: input.gasConnectionNumber,
+      electricity_bill_number: input.electricityBillNumber,
     })
     .eq('id', input.id)
   if (error) throw error
 }
 
-export async function deleteRoom(roomId: string): Promise<void> {
+export async function deleteHouse(houseId: string): Promise<void> {
   if (isDemoSession()) {
-    demoDeleteRoom(roomId)
+    demoDeleteHouse(houseId)
     return
   }
 
   const { count, error: tenantsError } = await supabase
     .from('tenants')
-    .select('id, beds!inner(room_id)', { count: 'exact', head: true })
-    .eq('beds.room_id', roomId)
+    .select('id', { count: 'exact', head: true })
+    .eq('house_id', houseId)
     .eq('status', 'active')
   if (tenantsError) throw tenantsError
-  if ((count ?? 0) > 0) throw new Error('Move or vacate tenants in this room before deleting it.')
+  if ((count ?? 0) > 0) throw new Error('Move or vacate tenants in this house before deleting it.')
 
-  const { error } = await supabase.from('rooms').delete().eq('id', roomId)
+  const { error } = await supabase.from('houses').delete().eq('id', houseId)
   if (error) throw error
 }

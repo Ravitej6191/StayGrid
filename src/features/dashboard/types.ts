@@ -5,6 +5,9 @@ export interface DashboardStats {
   occupancyPercent: number
   vacantCount: number
   pendingDepositsCount: number
+  loanOutstanding: number
+  loanPaidTillNow: number
+  activeLoansCount: number
 }
 
 export interface IncomeExpenseTrendPoint {

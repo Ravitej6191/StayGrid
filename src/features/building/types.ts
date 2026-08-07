@@ -1,44 +1,29 @@
-import type { PropertyType, RoomType } from '@/types/database.types'
+import type { HouseType, PropertyType } from '@/types/database.types'
 import type { Tenant } from '@/types/domain'
-import type { BedCardStatus, OccupancyStatus } from '@/constants/status'
+import type { OccupancyStatus } from '@/constants/status'
 
-export interface Bed {
-  id: string
-  roomId: string
-  bedLabel: string
-  status: BedCardStatus
-  tenant: Tenant | null
-}
-
-export interface Room {
+export interface House {
   id: string
   floorId: string
-  roomNumber: string
-  roomType: RoomType
-  capacity: number
-  beds: Bed[]
-  occupiedCount: number
-  vacantCount: number
+  houseNumber: string
+  houseType: HouseType
+  gasConnectionNumber: string | null
+  electricityBillNumber: string | null
+  /** A house holds at most one active tenant. */
+  tenant: Tenant | null
   occupancyStatus: OccupancyStatus
   hasRentPending: boolean
 }
 
-/** Room type determines bed capacity directly except Dorm, where the owner
- * enters an arbitrary bed count. */
-export const roomTypeOptions: { value: RoomType; label: string; capacity: number | null }[] = [
-  { value: 'single', label: 'Single', capacity: 1 },
-  { value: 'twin', label: 'Twin Sharing', capacity: 2 },
-  { value: 'sharing_3', label: '3 Sharing', capacity: 3 },
-  { value: 'sharing_4', label: '4 Sharing', capacity: 4 },
-  { value: 'sharing_5', label: '5 Sharing', capacity: 5 },
-  { value: 'sharing_6', label: '6 Sharing', capacity: 6 },
-  { value: 'sharing_7', label: '7 Sharing', capacity: 7 },
-  { value: 'sharing_8', label: '8 Sharing', capacity: 8 },
-  { value: 'dorm', label: 'Dorm', capacity: null },
+/** Purely descriptive — a house holds exactly one tenant regardless of type. */
+export const houseTypeOptions: { value: HouseType; label: string }[] = [
+  { value: '1bhk', label: '1BHK' },
+  { value: '2bhk', label: '2BHK' },
+  { value: '3bhk', label: '3BHK' },
 ]
 
-export function roomTypeLabel(roomType: RoomType): string {
-  return roomTypeOptions.find((o) => o.value === roomType)?.label ?? roomType
+export function houseTypeLabel(houseType: HouseType): string {
+  return houseTypeOptions.find((o) => o.value === houseType)?.label ?? houseType
 }
 
 export interface Floor {
@@ -46,7 +31,7 @@ export interface Floor {
   buildingId: string
   floorNumber: number
   name: string
-  rooms: Room[]
+  houses: House[]
 }
 
 export interface BuildingSummary {
@@ -60,9 +45,6 @@ export interface BuildingSummary {
   pincode: string
   contactPhone: string
   contactEmail: string
-  gstNumber: string | null
-  panNumber: string | null
   totalFloors: number
-  totalRooms: number
-  totalBeds: number
+  totalHouses: number
 }

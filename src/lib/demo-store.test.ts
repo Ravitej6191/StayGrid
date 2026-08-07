@@ -4,7 +4,7 @@ import type { DemoPayment } from './demo-store'
 // vitest's default test environment is plain Node, with no `window`/
 // `localStorage` global — demo-store.ts is written for the browser and
 // reads/writes through those directly. A minimal in-memory polyfill lets the
-// mutators below run as real integration tests (seed → add room → allot
+// mutators below run as real integration tests (seed → add house → allot
 // tenant → record payment) instead of only unit-testing the pure helper.
 class MemoryStorage implements Storage {
   private store = new Map<string, string>()
@@ -33,7 +33,7 @@ vi.stubGlobal('localStorage', new MemoryStorage())
 
 const {
   addFloor,
-  addRoom,
+  addHouse,
   addTenant,
   clearDemoDb,
   computeMonthlyRentStatus,
@@ -94,32 +94,32 @@ describe('computeMonthlyRentStatus', () => {
   })
 })
 
-/** Seeds a fresh demo building with one floor, one twin-sharing room (2
- * beds), and one active tenant allotted to the first bed — the baseline
- * every mutator test below builds on. */
-function seedTenantInRoom(rent: number, deposit: number) {
+/** Seeds a fresh demo building with one floor, two houses,
+ * and one active tenant allotted to the first house — the baseline every
+ * mutator test below builds on. */
+function seedTenantInHouse(rent: number, deposit: number) {
   seedFromOnboarding({
     propertyType: 'pg',
     buildingName: 'Test PG',
     address: '', city: '', state: '', pincode: '',
-    ownerName: 'Owner', phone: '', gstNumber: null, panNumber: null,
+    ownerName: 'Owner', phone: '',
   })
   const floor = addFloor({ name: 'Ground Floor', floorNumber: 0 })
-  const { beds } = addRoom({ floorId: floor.id, roomNumber: 'G1', roomType: 'twin', capacity: 2 })
+  const house1 = addHouse({ floorId: floor.id, houseNumber: 'G1', houseType: '1bhk', gasConnectionNumber: null, electricityBillNumber: null })
+  const house2 = addHouse({ floorId: floor.id, houseNumber: 'G2', houseType: '1bhk', gasConnectionNumber: null, electricityBillNumber: null })
   const tenant = addTenant({
-    bedId: beds[0]!.id,
-    name: 'Test Tenant', phone: '9876543210', email: null, aadhaarNumber: null,
-    emergencyContactName: null, emergencyContactPhone: null, bloodGroup: null,
-    occupation: null, company: null, photoUrl: null, rent, deposit,
+    houseId: house1.id,
+    name: 'Test Tenant', phone: '9876543210', aadhaarNumber: null,
+    occupation: null, photoUrl: null, rent, deposit,
   })
-  return { beds, tenant }
+  return { house1, house2, tenant }
 }
 
 describe('recordPayment (money-critical: rent status + receipts)', () => {
   beforeEach(() => clearDemoDb())
 
   it('marks the current month paid when a payment covers the full rent', () => {
-    const { tenant } = seedTenantInRoom(10000, 20000)
+    const { tenant } = seedTenantInHouse(10000, 20000)
     const forMonth = `${new Date().toISOString().slice(0, 7)}-01`
     recordPayment({ tenantId: tenant.id, amount: 10000, paymentMode: 'cash', paymentDate: '2026-07-05', forMonth, notes: null, receiptUrl: null })
 
@@ -131,7 +131,7 @@ describe('recordPayment (money-critical: rent status + receipts)', () => {
   })
 
   it('marks the month partial when a payment covers less than the rent', () => {
-    const { tenant } = seedTenantInRoom(10000, 20000)
+    const { tenant } = seedTenantInHouse(10000, 20000)
     const forMonth = `${new Date().toISOString().slice(0, 7)}-01`
     recordPayment({ tenantId: tenant.id, amount: 4000, paymentMode: 'upi', paymentDate: '2026-07-05', forMonth, notes: null, receiptUrl: null })
 
@@ -139,14 +139,14 @@ describe('recordPayment (money-critical: rent status + receipts)', () => {
   })
 
   it('does not touch rentStatus when the payment is for a past month, not the current one', () => {
-    const { tenant } = seedTenantInRoom(10000, 20000)
+    const { tenant } = seedTenantInHouse(10000, 20000)
     recordPayment({ tenantId: tenant.id, amount: 10000, paymentMode: 'cash', paymentDate: '2026-01-05', forMonth: '2026-01-01', notes: null, receiptUrl: null })
 
     expect(getDemoDb().tenants.find((t) => t.id === tenant.id)?.rentStatus).toBe('pending')
   })
 
   it('numbers receipts sequentially across payments', () => {
-    const { tenant } = seedTenantInRoom(10000, 20000)
+    const { tenant } = seedTenantInHouse(10000, 20000)
     recordPayment({ tenantId: tenant.id, amount: 5000, paymentMode: 'cash', paymentDate: '2026-01-05', forMonth: '2026-01-01', notes: null, receiptUrl: null })
     recordPayment({ tenantId: tenant.id, amount: 5000, paymentMode: 'cash', paymentDate: '2026-02-05', forMonth: '2026-02-01', notes: null, receiptUrl: null })
 
@@ -159,7 +159,7 @@ describe('recordDeposit', () => {
   beforeEach(() => clearDemoDb())
 
   it('stores the deposit with a real recordedAt timestamp, distinct from the backdatable paidDate', () => {
-    const { tenant } = seedTenantInRoom(10000, 20000)
+    const { tenant } = seedTenantInHouse(10000, 20000)
     recordDeposit({ tenantId: tenant.id, amount: 20000, paidDate: '2026-01-01', screenshotUrl: null })
 
     const stored = getDemoDb().tenants.find((t) => t.id === tenant.id)?.depositRecord
@@ -170,48 +170,46 @@ describe('recordDeposit', () => {
   })
 })
 
-describe('vacateTenant / reassignTenant / unassignTenant (bed-occupancy integrity)', () => {
+describe('vacateTenant / reassignTenant / unassignTenant (house-occupancy integrity)', () => {
   beforeEach(() => clearDemoDb())
 
-  it('vacating a tenant frees their bed and ends their stay', () => {
-    const { beds, tenant } = seedTenantInRoom(10000, 20000)
+  it('vacating a tenant frees their house and ends their stay', () => {
+    const { house1, tenant } = seedTenantInHouse(10000, 20000)
     vacateTenant(tenant.id)
 
     const db = getDemoDb()
     expect(db.tenants.find((t) => t.id === tenant.id)?.status).toBe('vacated')
-    expect(db.beds.find((b) => b.id === beds[0]!.id)?.status).toBe('vacant')
+    expect(db.tenants.find((t) => t.id === tenant.id)?.houseId).toBeNull()
+    expect(db.tenants.some((t) => t.status === 'active' && t.houseId === house1.id)).toBe(false)
   })
 
-  it('reassigning a tenant frees the old bed and occupies the new one', () => {
-    const { beds, tenant } = seedTenantInRoom(10000, 20000)
-    reassignTenant(tenant.id, beds[1]!.id)
+  it('reassigning a tenant moves them into the new house', () => {
+    const { house2, tenant } = seedTenantInHouse(10000, 20000)
+    reassignTenant(tenant.id, house2.id)
 
     const db = getDemoDb()
-    expect(db.beds.find((b) => b.id === beds[0]!.id)?.status).toBe('vacant')
-    expect(db.beds.find((b) => b.id === beds[1]!.id)?.status).toBe('occupied')
-    expect(db.tenants.find((t) => t.id === tenant.id)?.bedId).toBe(beds[1]!.id)
+    expect(db.tenants.find((t) => t.id === tenant.id)?.houseId).toBe(house2.id)
   })
 
-  it('refuses to reassign into a bed that is already occupied', () => {
-    const { beds, tenant } = seedTenantInRoom(10000, 20000)
+  it('refuses to reassign into a house that is already occupied', () => {
+    const { house2, tenant } = seedTenantInHouse(10000, 20000)
     addTenant({
-      bedId: beds[1]!.id,
-      name: 'Second Tenant', phone: '9999999999', email: null, aadhaarNumber: null,
-      emergencyContactName: null, emergencyContactPhone: null, bloodGroup: null,
-      occupation: null, company: null, photoUrl: null, rent: 8000, deposit: 8000,
+      houseId: house2.id,
+      name: 'Second Tenant', phone: '9999999999', aadhaarNumber: null,
+      occupation: null, photoUrl: null, rent: 8000, deposit: 8000,
     })
 
-    expect(() => reassignTenant(tenant.id, beds[1]!.id)).toThrow('already occupied')
+    expect(() => reassignTenant(tenant.id, house2.id)).toThrow('already occupied')
   })
 
-  it('unassigning a tenant frees the bed but keeps them active', () => {
-    const { beds, tenant } = seedTenantInRoom(10000, 20000)
+  it('unassigning a tenant frees the house but keeps them active', () => {
+    const { house1, tenant } = seedTenantInHouse(10000, 20000)
     unassignTenant(tenant.id)
 
     const db = getDemoDb()
     const updated = db.tenants.find((t) => t.id === tenant.id)
     expect(updated?.status).toBe('active')
-    expect(updated?.bedId).toBeNull()
-    expect(db.beds.find((b) => b.id === beds[0]!.id)?.status).toBe('vacant')
+    expect(updated?.houseId).toBeNull()
+    expect(db.tenants.some((t) => t.status === 'active' && t.houseId === house1.id)).toBe(false)
   })
 })

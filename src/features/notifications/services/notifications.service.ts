@@ -7,7 +7,6 @@ import {
   type DemoNotification,
   type NotificationType,
 } from '@/lib/demo-store'
-import { areNotificationsEnabled } from '@/lib/notification-prefs'
 
 export type { DemoNotification as AppNotification }
 
@@ -106,7 +105,6 @@ export async function pushSupabaseNotification(
   title: string,
   message: string,
 ): Promise<void> {
-  if (!areNotificationsEnabled()) return
   const { error } = await supabase.from('notifications').insert({ building_id: buildingId, type, title, message })
   if (error) console.error('[notifications] failed to log notification:', error.message)
 }
